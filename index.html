@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CloudGrip AI — Real-Time API Guard & Circuit Breaker</title>
+
+  <!-- Typography: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#ecfdf5',
+              500: '#10b981',
+              600: '#059669',
+              900: '#064e3b',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      background-color: #09090b;
+      color: #f4f4f5;
+      font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    }
+    
+    /* Custom subtle scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #09090b; }
+    ::-webkit-scrollbar-thumb { background: #27272a; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
+
+    .glow-bg {
+      background: radial-gradient(circle at 50% -20%, rgba(16, 185, 129, 0.08), transparent 70%);
+    }
+
+    .glass-card {
+      background: rgba(18, 18, 20, 0.7);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+  </style>
+</head>
+<body class="antialiased font-sans min-h-screen flex flex-col justify-between selection:bg-emerald-500/20 selection:text-emerald-400">
+
+  <!-- Subtle Radial Glow -->
+  <div class="fixed inset-0 glow-bg pointer-events-none"></div>
+
+  <div class="relative z-10 max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-6 pb-16 space-y-8">
+    
+    <!-- Top Navigation -->
+    <header class="flex items-center justify-between py-3 border-b border-white/5">
+      <div class="flex items-center space-x-3">
+        <div class="h-8 w-8 rounded-lg bg-zinc-900 border border-zinc-700/60 flex items-center justify-center shadow-inner">
+          <svg class="w-4 h-4 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+          </svg>
+        </div>
+        <div class="flex items-center space-x-2">
+          <span class="font-semibold text-sm tracking-tight text-white">CloudGrip AI</span>
+          <span class="text-[10px] font-mono tracking-wider px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400 border border-zinc-700/50">v1.0-beta</span>
+        </div>
+      </div>
+
+      <!-- Live Connection Pill -->
+      <div class="flex items-center space-x-6 text-xs">
+        <div class="flex items-center space-x-2 bg-zinc-900/80 border border-zinc-800 px-3 py-1.5 rounded-full">
+          <span class="relative flex h-2 w-2">
+            <span id="ping-ring" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span id="ping-dot" class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          </span>
+          <span id="connection-status" class="font-mono text-zinc-300 text-[11px]">PROXY ENGINE ONLINE</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Metric Cards Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+      
+      <!-- Card 1: Budget & Spend Monitor -->
+      <div class="glass-card rounded-2xl p-6 flex flex-col justify-between shadow-2xl relative overflow-hidden group">
+        <div>
+          <div class="flex items-center justify-between text-xs text-zinc-400 font-medium tracking-wide uppercase">
+            <span>Accumulated Budget</span>
+            <span id="budget-percentage" class="font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">0% Used</span>
+          </div>
+
+          <div class="mt-4 flex items-baseline justify-between">
+            <div id="spend-text" class="text-4xl font-extrabold tracking-tight font-mono text-white">$0.00</div>
+            <div class="text-xs text-zinc-500 font-mono">CAP: <span id="limit-text" class="text-zinc-300 font-bold">$0.50</span></div>
+          </div>
+        </div>
+
+        <!-- Custom Smooth Progress Bar -->
+        <div class="mt-6 space-y-2">
+          <div class="w-full bg-zinc-900 rounded-full h-2 overflow-hidden p-0.5 border border-white/5">
+            <div id="spend-bar" class="bg-gradient-to-r from-emerald-500 to-emerald-400 h-full rounded-full w-0 transition-all duration-500 ease-out shadow-[0_0_12px_rgba(16,185,129,0.4)]"></div>
+          </div>
+          <div class="flex justify-between text-[11px] text-zinc-500 font-mono">
+            <span>$0.00</span>
+            <span>$0.25</span>
+            <span>$0.50</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 2: Circuit Breaker Status -->
+      <div class="glass-card rounded-2xl p-6 flex flex-col justify-between shadow-2xl">
+        <div class="flex items-center justify-between text-xs text-zinc-400 font-medium tracking-wide uppercase">
+          <span>Circuit Guard</span>
+          <span class="text-[10px] font-mono text-zinc-500">AUTO-TERMINATE</span>
+        </div>
+
+        <div class="my-4">
+          <div id="guard-status-pill" class="inline-flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <span id="guard-status-text">Hard Limit Armored</span>
+          </div>
+          <p class="text-xs text-zinc-400 mt-3 leading-relaxed">
+            Requests are intercepted in real-time. Sockets sever automatically upon $0.50 threshold breach.
+          </p>
+        </div>
+
+        <div class="pt-3 border-t border-white/5 flex items-center justify-between text-xs text-zinc-500">
+          <span>Latency Impact</span>
+          <span class="font-mono text-zinc-300">&lt; 1.2ms</span>
+        </div>
+      </div>
+
+      <!-- Card 3: Traffic Telemetry Overview -->
+      <div class="glass-card rounded-2xl p-6 flex flex-col justify-between shadow-2xl">
+        <div class="flex items-center justify-between text-xs text-zinc-400 font-medium tracking-wide uppercase">
+          <span>Traffic Metrics</span>
+          <span class="text-[10px] font-mono text-zinc-500">LIVE SESSION</span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 my-2">
+          <div class="bg-zinc-900/50 p-3 rounded-xl border border-white/5">
+            <span class="text-[11px] text-zinc-500">Total Requests</span>
+            <div id="metric-requests" class="text-2xl font-bold font-mono text-white mt-1">0</div>
+          </div>
+          <div class="bg-zinc-900/50 p-3 rounded-xl border border-white/5">
+            <span class="text-[11px] text-zinc-500">Intercepted</span>
+            <div id="metric-blocked" class="text-2xl font-bold font-mono text-emerald-400 mt-1">0</div>
+          </div>
+        </div>
+
+        <div class="pt-3 border-t border-white/5 flex items-center justify-between text-xs text-zinc-500">
+          <span>Target Upstream</span>
+          <span class="font-mono text-zinc-300">Gemini / OpenAI</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Killswitch Banner Alert (Hidden until activated) -->
+    <div id="killswitch-banner" class="hidden glass-card border-red-500/40 bg-red-950/20 rounded-2xl p-5 shadow-2xl transition-all duration-300 animate-fade-in">
+      <div class="flex items-start justify-between">
+        <div class="flex items-start space-x-4">
+          <div class="p-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400">
+            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+          </div>
+          <div>
+            <h3 class="text-sm font-semibold text-red-200 tracking-tight">Circuit Breaker Triggered — Hard Limit Reached</h3>
+            <p id="killswitch-msg" class="text-xs text-red-300/80 mt-1 leading-relaxed">
+              CloudGrip has severed socket connections to prevent API account charges.
+            </p>
+          </div>
+        </div>
+        <span class="px-2.5 py-1 rounded-md bg-red-500/20 border border-red-500/40 text-[10px] font-mono font-bold text-red-300 uppercase tracking-wider">
+          STATUS 429 BLOCKED
+        </span>
+      </div>
+    </div>
+
+    <!-- Console / Live Stream Terminal -->
+    <div class="glass-card rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
+      
+      <!-- Terminal Header Bar -->
+      <div class="bg-zinc-900/90 px-4 py-3 border-b border-white/5 flex items-center justify-between">
+        <div class="flex items-center space-x-2">
+          <div class="flex space-x-1.5">
+            <div class="w-2.5 h-2.5 rounded-full bg-zinc-700"></div>
+            <div class="w-2.5 h-2.5 rounded-full bg-zinc-700"></div>
+            <div class="w-2.5 h-2.5 rounded-full bg-zinc-700"></div>
+          </div>
+          <span class="text-xs font-mono text-zinc-400 pl-3 border-l border-zinc-800">telemetry_stream.sse</span>
+        </div>
+
+        <div class="flex items-center space-x-3 text-xs">
+          <button id="clear-logs-btn" class="text-zinc-500 hover:text-zinc-300 transition-colors font-mono text-[11px] flex items-center space-x-1">
+            <span>clear console</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Log Output Container -->
+      <div id="log-container" class="p-4 font-mono text-[12px] h-64 overflow-y-auto space-y-2 bg-black/40 text-zinc-300 leading-relaxed">
+        <div class="text-zinc-600 italic">// Waiting for incoming proxy requests...</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Footer -->
+  <footer class="text-center text-xs text-zinc-600 font-mono py-6 border-t border-white/5">
+    CloudGrip AI Proxy Engine &bull; Zero-Trust API Budget Shield
+  </footer>
+
+  <!-- SSE Telemetry Integration Script -->
+  <script>
+    let totalRequests = 0;
+    let totalBlocked = 0;
+
+    const spendText = document.getElementById('spend-text');
+    const limitText = document.getElementById('limit-text');
+    const spendBar = document.getElementById('spend-bar');
+    const budgetPercentage = document.getElementById('budget-percentage');
+    
+    const guardStatusPill = document.getElementById('guard-status-pill');
+    const guardStatusText = document.getElementById('guard-status-text');
+    
+    const killswitchBanner = document.getElementById('killswitch-banner');
+    const killswitchMsg = document.getElementById('killswitch-msg');
+    const logContainer = document.getElementById('log-container');
+    
+    const metricRequests = document.getElementById('metric-requests');
+    const metricBlocked = document.getElementById('metric-blocked');
+    const clearLogsBtn = document.getElementById('clear-logs-btn');
+
+    // Clear logs helper
+    clearLogsBtn.addEventListener('click', () => {
+      logContainer.innerHTML = '<div class="text-zinc-600 italic">// Console cleared. Listening for stream events...</div>';
+    });
+
+    // Establish SSE connection
+    const eventSource = new EventSource('/api/telemetry');
+
+    function appendLogLine(method, endpoint, status, cost, isBlocked = false) {
+      const time = new Date().toLocaleTimeString();
+      const div = document.createElement('div');
+      div.className = 'flex items-center justify-between py-1 border-b border-white/[0.02] hover:bg-white/[0.02] px-2 rounded transition-colors';
+
+      if (isBlocked) {
+        div.innerHTML = `
+          <div class="flex items-center space-x-2">
+            <span class="text-zinc-500">[${time}]</span>
+            <span class="px-1.5 py-0.5 rounded text-[10px] bg-red-500/20 text-red-400 font-bold border border-red-500/30">429 KILLED</span>
+            <span class="text-red-300 font-semibold">${method} ${endpoint}</span>
+          </div>
+          <span class="text-red-400 font-bold">BLOCKED ($0.00)</span>
+        `;
+      } else {
+        div.innerHTML = `
+          <div class="flex items-center space-x-2">
+            <span class="text-zinc-500">[${time}]</span>
+            <span class="px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30">200 OK</span>
+            <span class="text-zinc-200">${method} ${endpoint}</span>
+          </div>
+          <span class="text-emerald-400">+${cost}</span>
+        `;
+      }
+
+      logContainer.appendChild(div);
+      logContainer.scrollTop = logContainer.scrollHeight;
+    }
+
+    eventSource.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+
+      if (data.type === 'INIT') {
+        const spend = data.current_spend;
+        const limit = data.limit;
+        const percent = Math.min((spend / limit) * 100, 100);
+
+        spendText.textContent = `$${spend.toFixed(2)}`;
+        limitText.textContent = `$${limit.toFixed(2)}`;
+        spendBar.style.width = `${percent}%`;
+        budgetPercentage.textContent = `${percent.toFixed(0)}% Used`;
+      }
+
+      if (data.type === 'REQUEST_ALLOWED') {
+        totalRequests++;
+        metricRequests.textContent = totalRequests;
+
+        const spend = data.current_spend;
+        const limit = data.limit;
+        const percent = Math.min((spend / limit) * 100, 100);
+
+        spendText.textContent = `$${spend.toFixed(2)}`;
+        spendBar.style.width = `${percent}%`;
+        budgetPercentage.textContent = `${percent.toFixed(0)}% Used`;
+
+        appendLogLine('POST', '/v1beta/chat/completions', 200, '$0.10', false);
+      }
+
+      if (data.type === 'KILLSWITCH_TRIGGERED') {
+        totalRequests++;
+        totalBlocked++;
+        metricRequests.textContent = totalRequests;
+        metricBlocked.textContent = totalBlocked;
+
+        spendText.textContent = `$${data.current_spend.toFixed(2)}`;
+        spendBar.style.width = '100%';
+        spendBar.className = 'bg-red-500 h-full rounded-full transition-all duration-500 ease-out shadow-[0_0_12px_rgba(239,68,68,0.5)]';
+        budgetPercentage.textContent = '100% EXCEEDED';
+        budgetPercentage.className = 'font-mono text-red-400 bg-red-500/10 px-2 py-0.5 rounded border border-red-500/20';
+
+        // Update Guard Pill Status
+        guardStatusPill.className = 'inline-flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-red-500/20 border border-red-500/40 text-red-400 text-xs font-semibold';
+        guardStatusText.textContent = 'Circuit Breaker Active';
+
+        // Show Banner Alert
+        killswitchBanner.classList.remove('hidden');
+        killswitchMsg.textContent = data.message;
+
+        appendLogLine('POST', '/v1beta/chat/completions', 429, '$0.00', true);
+      }
+    };
+  </script>
+</body>
+</html>
