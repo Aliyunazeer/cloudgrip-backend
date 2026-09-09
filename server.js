@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 import express from 'express';
-import { createProxyMiddleware } from 'http-proxy-middleware';
+import { createProxyMiddleware, fixRequestBody } from 'http-proxy-middleware';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { Redis } from '@upstash/redis';
@@ -13,7 +13,18 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Initialize Upstash Redis if env vars exist, otherwise fallback to in-memory store
+// Enable JSON parsing with a fallback for malformed JSON payloads
+app.use(express.json());
+app.use((err, req, res, next) => {
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    console.warn('[Cost Engine] Received malformed JSON payload. Using fallback token calculation.');
+    req.body = {}; // Fallback to empty body
+    return next();
+  }
+  next();
+});
+
+// Initialize Upstash Redis if credentials exist
 let redis = null;
 if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
   redis = new Redis({
@@ -22,7 +33,7 @@ if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) 
   });
   console.log('[CloudGrip] Connected to Upstash Redis for persistent tracking.');
 } else {
-  console.log('[CloudGrip] No Redis credentials found. Running in in-memory fallback mode.');
+  console.log('[CloudGrip] Running in in-memory fallback mode.');
 }
 
 // In-Memory Fallback State
@@ -34,6 +45,30 @@ let localState = {
 };
 
 let clients = [];
+
+// Base Model Pricing Rates (per 1,000 tokens)
+const MODEL_PRICING = {
+  'gemini-1.5-flash': { inputPer1k: 0.000075, outputPer1k: 0.0003 },
+  'gemini-1.5-pro':   { inputPer1k: 0.00125,  outputPer1k: 0.005 },
+  'default':          { inputPer1k: 0.00015,  outputPer1k: 0.0006 }
+};
+
+// Token & Cost Calculation Engine
+function calculateTokenCost(req) {
+  const body = req.body || {};
+  const payloadString = JSON.stringify(body);
+  
+  // Standard token heuristic: ~4 characters per token
+  const estimatedInputTokens = Math.max(Math.ceil(payloadString.length / 4), 10);
+  const estimatedOutputTokens = 150; // Projected generation buffer
+
+  const pricing = MODEL_PRICING['default'];
+  const inputCost = (estimatedInputTokens / 1000) * pricing.inputPer1k;
+  const outputCost = (estimatedOutputTokens / 1000) * pricing.outputPer1k;
+  
+  const totalCost = inputCost + outputCost;
+  return parseFloat(totalCost.toFixed(6));
+}
 
 // Helper to update & stream state
 async function updateAndBroadcastState(spendDelta = 0, isBlocked = false) {
@@ -61,7 +96,7 @@ async function updateAndBroadcastState(spendDelta = 0, isBlocked = false) {
 
   const payload = {
     ...localState,
-    totalSpend: parseFloat(localState.totalSpend.toFixed(2)),
+    totalSpend: parseFloat(localState.totalSpend.toFixed(4)),
     timestamp: new Date().toISOString()
   };
 
@@ -81,7 +116,6 @@ app.get('/api/telemetry/stream', (req, res) => {
   const clientId = Date.now();
   clients.push({ id: clientId, res });
 
-  // Send initial state on connection
   updateAndBroadcastState(0, false);
 
   req.on('close', () => {
@@ -110,7 +144,6 @@ app.post('/api/budget/reset', async (req, res) => {
 
 // Budget Guard Middleware
 const budgetGuard = async (req, res, next) => {
-  // Support dynamic custom budget caps via 'x-max-budget' header
   const customCap = req.headers['x-max-budget'] ? parseFloat(req.headers['x-max-budget']) : 0.50;
   const currentSpend = redis ? parseFloat((await redis.get('cloudgrip:total_spend')) || 0) : localState.totalSpend;
 
@@ -125,8 +158,11 @@ const budgetGuard = async (req, res, next) => {
     });
   }
 
-  const estimatedCost = 0.10;
-  await updateAndBroadcastState(estimatedCost, false);
+  // Calculate precise cost based on payload size
+  const calculatedCost = calculateTokenCost(req);
+  console.log(`[Cost Engine] Calculated request cost: $${calculatedCost}`);
+
+  await updateAndBroadcastState(calculatedCost, false);
   next();
 };
 
@@ -135,6 +171,7 @@ app.use('/v1beta', budgetGuard, createProxyMiddleware({
   target: 'https://generativelanguage.googleapis.com',
   changeOrigin: true,
   pathRewrite: { '^/v1beta': '/v1beta' },
+  onProxyReq: fixRequestBody,
   onError: (err, req, res) => {
     res.status(500).json({ error: 'Proxy Gateway Error', details: err.message });
   }
