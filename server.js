@@ -1,182 +1,202 @@
-import dotenv from 'dotenv';
+import 'dotenv/config';
 import express from 'express';
-import { createProxyMiddleware, fixRequestBody } from 'http-proxy-middleware';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { Redis } from '@upstash/redis';
-
-dotenv.config();
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import { Readable } from 'stream';
+import EventEmitter from 'events';
+import Database from 'better-sqlite3';
+import crypto from 'crypto';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const telemetryEmitter = new EventEmitter();
 
-// Enable JSON parsing with a fallback for malformed JSON payloads
-app.use(express.json());
-app.use((err, req, res, next) => {
-  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
-    console.warn('[Cost Engine] Received malformed JSON payload. Using fallback token calculation.');
-    req.body = {}; // Fallback to empty body
-    return next();
+// --- Initialize SQLite Database ---
+const db = new Database('cloudgrip.db');
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS clients (
+    client_key TEXT PRIMARY KEY,
+    id TEXT NOT NULL,
+    budget_usd REAL NOT NULL,
+    current_spend_usd REAL NOT NULL,
+    trial_expires_at TEXT NOT NULL
+  )
+`);
+
+// Insert default demo key if it doesn't exist yet
+const existingDemo = db.prepare('SELECT * FROM clients WHERE client_key = ?').get('cg-demo-key-12345');
+if (!existingDemo) {
+  const oneWeekFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  db.prepare(`
+    INSERT INTO clients (client_key, id, budget_usd, current_spend_usd, trial_expires_at)
+    VALUES (?, ?, ?, ?, ?)
+  `).run('cg-demo-key-12345', 'client-demo', 0.05, 0.0, oneWeekFromNow);
+  console.log('[CloudGrip DB] Initialized default demo key with 7-day trial.');
+}
+
+// --- Express Middleware Setup ---
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// --- Public Registration Endpoint ---
+app.post('/register', (req, res) => {
+  const { name } = req.body || {};
+  const clientId = name || `user_${crypto.randomBytes(3).toString('hex')}`;
+  const clientKey = `cg-${crypto.randomBytes(16).toString('hex')}`;
+  const oneWeekFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const trialBudgetUSD = 0.50; // Free trial budget cap
+
+  try {
+    db.prepare(`
+      INSERT INTO clients (client_key, id, budget_usd, current_spend_usd, trial_expires_at)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(clientKey, clientId, trialBudgetUSD, 0.0, oneWeekFromNow);
+
+    console.log(`[CloudGrip Registration] Created new trial key for: ${clientId}`);
+
+    res.json({
+      success: true,
+      message: '7-day free trial activated!',
+      apiKey: clientKey,
+      trialBudgetUSD,
+      expiresAt: oneWeekFromNow,
+      usageHeader: 'x-cloudgrip-key'
+    });
+  } catch (err) {
+    console.error('[Registration Error]', err.message);
+    res.status(500).json({ error: 'Failed to generate trial key' });
   }
+});
+
+// --- Authentication Middleware (Database-backed) ---
+app.use((req, res, next) => {
+  if (req.path === '/events' || req.path === '/register') return next();
+
+  const clientKey = req.headers['x-cloudgrip-key'] || req.query.cloudgrip_key;
+
+  if (!clientKey) {
+    return res.status(401).json({ error: 'Unauthorized: Missing x-cloudgrip-key header' });
+  }
+
+  const clientConfig = db.prepare('SELECT * FROM clients WHERE client_key = ?').get(clientKey);
+  
+  if (!clientConfig) {
+    console.warn(`[CloudGrip Auth] Rejected unknown key: ${clientKey}`);
+    return res.status(403).json({ error: 'Forbidden: Invalid X-CloudGrip-Key' });
+  }
+
+  // Check trial expiration
+  if (new Date() > new Date(clientConfig.trial_expires_at)) {
+    return res.status(403).json({ error: 'Trial Expired', message: 'Your 7-day free trial has expired. Please upgrade.' });
+  }
+
+  req.clientConfig = {
+    id: clientConfig.id,
+    key: clientConfig.client_key,
+    budgetUSD: clientConfig.budget_usd,
+    currentSpendUSD: clientConfig.current_spend_usd
+  };
   next();
 });
 
-// Initialize Upstash Redis if credentials exist
-let redis = null;
-if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
-  redis = new Redis({
-    url: process.env.UPSTASH_REDIS_REST_URL,
-    token: process.env.UPSTASH_REDIS_REST_TOKEN,
-  });
-  console.log('[CloudGrip] Connected to Upstash Redis for persistent tracking.');
-} else {
-  console.log('[CloudGrip] Running in in-memory fallback mode.');
-}
+// --- Budget Guard Middleware ---
+const checkBudget = (req, res, next) => {
+  if (req.path === '/events' || req.path === '/register') return next();
+  const { budgetUSD, currentSpendUSD } = req.clientConfig;
 
-// In-Memory Fallback State
-let localState = {
-  totalSpend: 0.00,
-  requestCount: 0,
-  interceptedCount: 0,
-  isCircuitBreakerActive: false,
-};
-
-let clients = [];
-
-// Base Model Pricing Rates (per 1,000 tokens)
-const MODEL_PRICING = {
-  'gemini-1.5-flash': { inputPer1k: 0.000075, outputPer1k: 0.0003 },
-  'gemini-1.5-pro':   { inputPer1k: 0.00125,  outputPer1k: 0.005 },
-  'default':          { inputPer1k: 0.00015,  outputPer1k: 0.0006 }
-};
-
-// Token & Cost Calculation Engine
-function calculateTokenCost(req) {
-  const body = req.body || {};
-  const payloadString = JSON.stringify(body);
-  
-  // Standard token heuristic: ~4 characters per token
-  const estimatedInputTokens = Math.max(Math.ceil(payloadString.length / 4), 10);
-  const estimatedOutputTokens = 150; // Projected generation buffer
-
-  const pricing = MODEL_PRICING['default'];
-  const inputCost = (estimatedInputTokens / 1000) * pricing.inputPer1k;
-  const outputCost = (estimatedOutputTokens / 1000) * pricing.outputPer1k;
-  
-  const totalCost = inputCost + outputCost;
-  return parseFloat(totalCost.toFixed(6));
-}
-
-// Helper to update & stream state
-async function updateAndBroadcastState(spendDelta = 0, isBlocked = false) {
-  if (redis) {
-    try {
-      if (spendDelta > 0) {
-        localState.totalSpend = await redis.incrbyfloat('cloudgrip:total_spend', spendDelta);
-      } else {
-        localState.totalSpend = parseFloat((await redis.get('cloudgrip:total_spend')) || 0);
-      }
-      localState.requestCount = await redis.incr('cloudgrip:request_count');
-      if (isBlocked) {
-        localState.interceptedCount = await redis.incr('cloudgrip:intercepted_count');
-      } else {
-        localState.interceptedCount = parseInt((await redis.get('cloudgrip:intercepted_count')) || 0, 10);
-      }
-    } catch (err) {
-      console.error('[Redis Error] Falling back to memory:', err.message);
-    }
-  } else {
-    localState.totalSpend += spendDelta;
-    localState.requestCount += 1;
-    if (isBlocked) localState.interceptedCount += 1;
-  }
-
-  const payload = {
-    ...localState,
-    totalSpend: parseFloat(localState.totalSpend.toFixed(4)),
-    timestamp: new Date().toISOString()
-  };
-
-  clients.forEach(client => client.res.write(`data: ${JSON.stringify(payload)}\n\n`));
-  return payload;
-}
-
-app.use(express.static(__dirname));
-
-// SSE Telemetry Stream
-app.get('/api/telemetry/stream', (req, res) => {
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-  res.flushHeaders();
-
-  const clientId = Date.now();
-  clients.push({ id: clientId, res });
-
-  updateAndBroadcastState(0, false);
-
-  req.on('close', () => {
-    clients = clients.filter(c => c.id !== clientId);
-  });
-});
-
-// Admin endpoint to reset budget counter
-app.post('/api/budget/reset', async (req, res) => {
-  localState = {
-    totalSpend: 0.00,
-    requestCount: 0,
-    interceptedCount: 0,
-    isCircuitBreakerActive: false,
-  };
-
-  if (redis) {
-    await redis.set('cloudgrip:total_spend', 0);
-    await redis.set('cloudgrip:request_count', 0);
-    await redis.set('cloudgrip:intercepted_count', 0);
-  }
-
-  await updateAndBroadcastState(0, false);
-  res.json({ success: true, message: 'Budget state reset successfully.' });
-});
-
-// Budget Guard Middleware
-const budgetGuard = async (req, res, next) => {
-  const customCap = req.headers['x-max-budget'] ? parseFloat(req.headers['x-max-budget']) : 0.50;
-  const currentSpend = redis ? parseFloat((await redis.get('cloudgrip:total_spend')) || 0) : localState.totalSpend;
-
-  if (currentSpend >= customCap) {
-    localState.isCircuitBreakerActive = true;
-    await updateAndBroadcastState(0, true);
-
-    return res.status(429).json({
-      error: 'Circuit Breaker Triggered',
-      message: `Hard spend limit of $${customCap.toFixed(2)} reached. Request blocked by CloudGrip AI.`,
-      status: 429
+  if (currentSpendUSD >= budgetUSD) {
+    return res.status(429).json({ 
+      error: 'Quota Exceeded', 
+      message: `Spend limit of $${budgetUSD.toFixed(2)} reached.` 
     });
   }
-
-  // Calculate precise cost based on payload size
-  const calculatedCost = calculateTokenCost(req);
-  console.log(`[Cost Engine] Calculated request cost: $${calculatedCost}`);
-
-  await updateAndBroadcastState(calculatedCost, false);
   next();
 };
 
-// Target Reverse Proxy
-app.use('/v1beta', budgetGuard, createProxyMiddleware({
-  target: 'https://generativelanguage.googleapis.com',
-  changeOrigin: true,
-  pathRewrite: { '^/v1beta': '/v1beta' },
-  onProxyReq: fixRequestBody,
-  onError: (err, req, res) => {
-    res.status(500).json({ error: 'Proxy Gateway Error', details: err.message });
+app.use(checkBudget);
+
+// --- Transparent Proxy Handler with Persistent DB Spend Tracking ---
+app.all(/.*/, async (req, res) => {
+  if (req.path === '/events') {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    const onTelemetry = (data) => res.write(`data: ${JSON.stringify(data)}\n\n`);
+    telemetryEmitter.on('request', onTelemetry);
+    req.on('close', () => telemetryEmitter.removeListener('request', onTelemetry));
+    return;
   }
-}));
+
+  try {
+    const targetUrl = `https://generativelanguage.googleapis.com${req.originalUrl}`;
+
+    const headers = {};
+    for (const [key, value] of Object.entries(req.headers)) {
+      const lowerKey = key.toLowerCase();
+      if (!['host', 'content-length', 'x-cloudgrip-key', 'x-max-budget', 'connection'].includes(lowerKey)) {
+        headers[key] = value;
+      }
+    }
+
+    const geminiKey = process.env.GEMINI_API_KEY;
+    if (geminiKey) {
+      headers['x-goog-api-key'] = geminiKey;
+      delete headers['authorization'];
+    }
+
+    const bodyData = ['POST', 'PUT', 'PATCH'].includes(req.method)
+      ? (typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {}))
+      : undefined;
+
+    if (bodyData && !headers['content-type']) {
+      headers['content-type'] = 'application/json';
+    }
+
+    const response = await fetch(targetUrl, {
+      method: req.method,
+      headers,
+      body: bodyData,
+    });
+
+    if (response.ok) {
+      const newSpend = req.clientConfig.currentSpendUSD + 0.01;
+      db.prepare('UPDATE clients SET current_spend_usd = ? WHERE client_key = ?').run(newSpend, req.clientConfig.key);
+      req.clientConfig.currentSpendUSD = newSpend;
+      console.log(`[CloudGrip Budget] Client ${req.clientConfig.id} persistent spend: $${newSpend.toFixed(2)}`);
+    }
+
+    telemetryEmitter.emit('request', {
+      timestamp: new Date().toISOString(),
+      clientId: req.clientConfig.id,
+      path: req.originalUrl,
+      targetUrl,
+      method: req.method,
+      status: response.status,
+      currentSpendUSD: req.clientConfig.currentSpendUSD
+    });
+
+    res.status(response.status);
+
+    response.headers.forEach((value, key) => {
+      const lowerKey = key.toLowerCase();
+      if (!['content-encoding', 'transfer-encoding', 'content-length'].includes(lowerKey)) {
+        res.setHeader(key, value);
+      }
+    });
+
+    if (response.body) {
+      const nodeStream = Readable.fromWeb(response.body);
+      nodeStream.pipe(res);
+    } else {
+      res.end();
+    }
+  } catch (err) {
+    console.error('[Proxy Error]', err.message);
+    if (!res.headersSent) {
+      res.status(502).json({ error: 'Proxy Gateway Error', details: err.message });
+    }
+  }
+});
 
 app.listen(PORT, () => {
-  console.log(`[CloudGrip Engine] Listening on port ${PORT}`);
+  console.log(`[CloudGrip Engine] Listening on port ${PORT} with registration & SQLite persistence active`);
 });
