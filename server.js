@@ -7,6 +7,7 @@ import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import fs from 'fs';
 import path from 'path';
+import axios from 'axios';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -733,9 +734,9 @@ app.get('/', (req, res) => {
 
           <div style="margin-top: 24px; border-top: 1px solid var(--border); padding-top: 20px;">
             <h3>Payment Method & Subscription Top-Up</h3>
-            <p>Add funds or renew your subscription tier to maintain uninterrupted API proxy access.</p>
+            <p>Add funds or renew your subscription tier via Paystack to maintain uninterrupted API proxy access.</p>
             <div class="key-row">
-              <input type="number" id="update-budget-input" step="5" min="5" style="flex:1;" placeholder="20.00">
+              <input type="number" id="update-budget-input" step="5" min="5" style="flex:1;" placeholder="Amount in NGN (e.g. 5000)">
               <button class="btn" style="width: 140px; margin:0;" onclick="updateBudget()">Make Payment</button>
             </div>
           </div>
@@ -790,6 +791,17 @@ app.get('/', (req, res) => {
     let eventSource = null;
 
     window.onload = async () => {
+      // Check query params for payment redirect notification
+      const urlParams = new URLSearchParams(window.location.search);
+      const paymentStatus = urlParams.get('payment');
+      if (paymentStatus === 'success') {
+        alert('Payment successful via Paystack! Your balance and account key have been updated.');
+        window.history.replaceState({}, document.title, window.location.pathname);
+      } else if (paymentStatus === 'failed') {
+        alert('Payment verification failed or was cancelled.');
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+
       const savedKey = localStorage.getItem('cloudgrip_key');
       if (savedKey) {
         await loadDashboard(savedKey);
@@ -955,28 +967,27 @@ app.get('/', (req, res) => {
       }
     }
 
+    // Real Paystack Checkout Integration
     async function updateBudget() {
       const key = localStorage.getItem('cloudgrip_key');
       const addAmount = parseFloat(document.getElementById('update-budget-input').value);
-      if(isNaN(addAmount) || addAmount <= 0) return alert('Please enter a valid payment amount.');
+      if(isNaN(addAmount) || addAmount <= 0) return alert('Please enter a valid amount.');
 
       try {
-        const res = await fetch('/client/budget', {
+        const res = await fetch('/api/topup/initialize', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-cloudgrip-key': key },
-          body: JSON.stringify({ budget: addAmount })
+          body: JSON.stringify({ amount: addAmount })
         });
         const data = await res.json();
-        if(data.success) {
-          document.getElementById('stat-spend').innerText = '$' + data.currentSpendUSD.toFixed(4);
-          document.getElementById('stat-status').innerText = 'Active Paid Tier';
-          document.getElementById('stat-status').style.color = 'var(--success-text)';
-          alert('Payment successful! Account key reactivated and credit updated.');
+        if(data.status && data.authorization_url) {
+          // Redirect securely to Paystack real checkout page
+          window.location.href = data.authorization_url;
         } else {
-          alert(data.error || 'Payment failed.');
+          alert(data.error || 'Failed to initialize Paystack checkout.');
         }
       } catch(e) {
-        alert('Network connectivity error.');
+        alert('Network connectivity error connecting to payment gateway.');
       }
     }
 
@@ -1095,28 +1106,88 @@ app.get('/client/stats', (req, res) => {
   });
 });
 
-// Endpoint to process payments / top-up and reactivate expired accounts
-app.post('/client/budget', (req, res) => {
+// --- PAYSTACK REAL PAYMENT INTEGRATION ROUTES ---
+
+// 1. Initialize Real Paystack Transaction
+app.post('/api/topup/initialize', async (req, res) => {
   const clientKey = req.headers['x-cloudgrip-key'];
   if (!clientKey) return res.status(401).json({ error: 'Unauthorized' });
 
-  const { budget } = req.body || {};
-  if (typeof budget !== 'number' || budget <= 0) {
+  const client = db.prepare('SELECT * FROM clients WHERE client_key = ?').get(clientKey);
+  if (!client) return res.status(403).json({ error: 'Forbidden' });
+
+  const { amount } = req.body || {}; // amount in NGN or USD depending on your account currency
+  if (typeof amount !== 'number' || amount <= 0) {
     return res.status(400).json({ error: 'Invalid payment amount.' });
   }
 
+  const paystackSecret = process.env.PAYSTACK_SECRET_KEY;
+  if (!paystackSecret) {
+    return res.status(500).json({ error: 'Paystack secret key is not configured on the server environment variables.' });
+  }
+
   try {
-    const client = db.prepare('SELECT * FROM clients WHERE client_key = ?').get(clientKey);
-    const newSpend = client.current_spend_usd + budget;
-    // Extend trial by another 30 days upon payment and set status back to active
-    const newExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    const callbackUrl = `${process.env.BASE_URL || 'https://cloudgrip-ai.onrender.com'}/api/topup/verify?client_key=${clientKey}&amount=${amount}`;
+    
+    const paystackResponse = await axios.post('https://api.paystack.co/transaction/initialize', {
+      email: client.email,
+      amount: Math.round(amount * 100), // Paystack expects amount in Kobo/lowest currency unit
+      callback_url: callbackUrl
+    }, {
+      headers: {
+        Authorization: `Bearer ${paystackSecret}`,
+        'Content-Type': 'application/json'
+      }
+    });
 
-    db.prepare('UPDATE clients SET current_spend_usd = ?, budget_usd = ?, trial_expires_at = ?, status = ? WHERE client_key = ?')
-      .run(newSpend, budget, newExpiry, 'active', clientKey);
-
-    res.json({ success: true, currentSpendUSD: newSpend, budgetUSD: budget });
+    if (paystackResponse.data && paystackResponse.data.status) {
+      res.json({
+        status: true,
+        authorization_url: paystackResponse.data.data.authorization_url
+      });
+    } else {
+      res.status(400).json({ error: 'Could not initialize Paystack transaction.' });
+    }
   } catch (err) {
-    res.status(500).json({ error: 'Failed to process payment' });
+    console.error('Paystack Initialization Error:', err.response?.data || err.message);
+    res.status(500).json({ error: 'Payment gateway connection failed.' });
+  }
+});
+
+// 2. Verify Paystack Transaction Callback & Credit Account
+app.get('/api/topup/verify', async (req, res) => {
+  const { reference, client_key, amount } = req.query;
+  if (!reference || !client_key) {
+    return res.redirect('/?payment=failed');
+  }
+
+  const paystackSecret = process.env.PAYSTACK_SECRET_KEY;
+  try {
+    const verifyResponse = await axios.get(`https://api.paystack.co/transaction/verify/${reference}`, {
+      headers: {
+        Authorization: `Bearer ${paystackSecret}`
+      }
+    });
+
+    const txData = verifyResponse.data;
+    if (txData && txData.status && txData.data.status === 'success') {
+      const client = db.prepare('SELECT * FROM clients WHERE client_key = ?').get(client_key);
+      if (client) {
+        // Convert top-up value appropriately (e.g. mapping NGN top-up to USD value or adding direct numeric credit)
+        const addedValueUSD = parseFloat(amount) || 10;
+        const newSpend = client.current_spend_usd + addedValueUSD;
+        const newExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+        db.prepare('UPDATE clients SET current_spend_usd = ?, budget_usd = ?, trial_expires_at = ?, status = ? WHERE client_key = ?')
+          .run(newSpend, addedValueUSD, newExpiry, 'active', client_key);
+      }
+      return res.redirect('/?payment=success');
+    } else {
+      return res.redirect('/?payment=failed');
+    }
+  } catch (err) {
+    console.error('Paystack Verification Error:', err.response?.data || err.message);
+    return res.redirect('/?payment=failed');
   }
 });
 
@@ -1193,7 +1264,7 @@ app.post('/login', async (req, res) => {
 });
 
 app.use((req, res, next) => {
-  if (['/events', '/register', '/login', '/', '/terms', '/privacy', '/client/stats', '/client/budget', '/forgot-password'].includes(req.path)) return next();
+  if (['/events', '/register', '/login', '/', '/terms', '/privacy', '/client/stats', '/api/topup/initialize', '/api/topup/verify', '/forgot-password'].includes(req.path)) return next();
 
   const clientKey = req.headers['x-cloudgrip-key'] || req.query.cloudgrip_key;
   if (!clientKey) return res.status(401).json({ error: 'Unauthorized: Missing key' });
@@ -1214,7 +1285,7 @@ app.use((req, res, next) => {
 });
 
 app.all(/.*/, async (req, res) => {
-  if (['/', '/register', '/login', '/events', '/terms', '/privacy', '/client/stats', '/client/budget', '/forgot-password'].includes(req.path)) return;
+  if (['/', '/register', '/login', '/events', '/terms', '/privacy', '/client/stats', '/api/topup/initialize', '/api/topup/verify', '/forgot-password'].includes(req.path)) return;
 
   let statusCode = 502;
   let cost = 0.01;
