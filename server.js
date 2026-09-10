@@ -56,7 +56,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 app.get('/', (req, res) => {
-  res.send(`<!DOCTYPE html>
+ res.send(`<!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
   <meta charset="UTF-8">
@@ -1005,9 +1005,7 @@ app.get('/', (req, res) => {
         </tr>
       `).join('');
     }
-      `).join('');
-    }
-
+   
     function initEventStream(key) {
       if(eventSource) eventSource.close();
       eventSource = new EventSource('/events?cloudgrip_key=' + encodeURIComponent(key));
