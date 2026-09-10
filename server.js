@@ -993,15 +993,15 @@ app.get('/', (req, res) => {
 
     function updateLogsTable(logs) {
       const tbody = document.getElementById('logs-table-body');
-      tbody.innerHTML = logs.map(log => \`
+      tbody.innerHTML = logs.map(log => `
         <tr>
-          <td>\${log.timestamp}</td>
-          <td>\${log.method}</td>
-          <td>\${log.endpoint}</td>
-          <td><span class="status-badge \${log.status_code === 200 ? 'status-200' : 'status-err'}">\${log.status_code}</span></td>
-          <td>$\${log.cost.toFixed(4)}</td>
+          <td>${log.timestamp}</td>
+          <td>${log.method}</td>
+          <td>${log.endpoint}</td>
+          <td><span class="status-badge ${log.status_code === 200 ? 'status-200' : 'status-err'}">${log.status_code}</span></td>
+          <td>$${log.cost.toFixed(4)}</td>
         </tr>
-      \`).join('');
+      `).join('');
     }
 
     function initEventStream(key) {
@@ -1019,7 +1019,7 @@ app.get('/', (req, res) => {
             const timeStr = new Date().toTimeString().split(' ')[0];
             const line = document.createElement('div');
             line.className = 'terminal-line';
-            line.innerHTML = \`<span class="term-time">[\${timeStr}]</span> <span class="term-method">\${log.method}</span> <span class="term-path">\${log.endpoint}</span> <span class="term-status \${log.status_code !== 200 ? 'err' : ''}">[\${log.status_code}]</span> <span class="term-cost">$\${log.cost.toFixed(4)}</span>\`;
+            line.innerHTML = `<span class="term-time">[${timeStr}]</span> <span class="term-method">${log.method}</span> <span class="term-path">${log.endpoint}</span> <span class="term-status ${log.status_code !== 200 ? 'err' : ''}">[${log.status_code}]</span> <span class="term-cost">$${log.cost.toFixed(4)}</span>`;
             term.appendChild(line);
             term.scrollTop = term.scrollHeight;
 
