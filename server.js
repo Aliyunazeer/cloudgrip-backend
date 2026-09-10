@@ -5,12 +5,24 @@ import EventEmitter from 'events';
 import Database from 'better-sqlite3';
 import crypto from 'crypto';
 import bcrypt from 'bcrypt';
+import fs from 'fs';
+import path from 'path';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 const telemetryEmitter = new EventEmitter();
 
-const db = new Database('/tmp/cloudgrip.db');
+// Ensure persistent storage directory if mounted via volume (e.g. Render/Railway persistent disk)
+const dataDir = process.env.DATA_DIR || '/tmp';
+if (!fs.existsSync(dataDir)) {
+  try {
+    fs.mkdirSync(dataDir, { recursive: true });
+  } catch (e) {
+    // fallback
+  }
+}
+const dbPath = path.join(dataDir, 'cloudgrip.db');
+const db = new Database(dbPath);
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS clients (
@@ -226,6 +238,30 @@ app.get('/', (req, res) => {
       color: #fff;
       font-weight: 600;
       box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+
+    .pricing-banner {
+      background: rgba(16, 185, 129, 0.05);
+      border: 1px solid rgba(16, 185, 129, 0.15);
+      border-radius: var(--radius-sm);
+      padding: 12px;
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .pricing-banner .plan-name {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--success-text);
+    }
+
+    .pricing-banner .plan-price {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      font-weight: 600;
+      color: #fff;
     }
 
     .form-group {
@@ -563,6 +599,10 @@ app.get('/', (req, res) => {
 
         <!-- Signup Form -->
         <div id="signup-box" class="hidden">
+          <div class="pricing-banner">
+            <span class="plan-name">Pro Starter Credit</span>
+            <span class="plan-price">$10.00 / initial load</span>
+          </div>
           <div class="form-group">
             <label>Work Email</label>
             <input type="email" id="su-email" placeholder="name@company.com">
@@ -571,7 +611,7 @@ app.get('/', (req, res) => {
             <label>Password</label>
             <input type="password" id="su-pass" placeholder="Create a secure password">
           </div>
-          <button class="btn" onclick="register()">Create Account & Start Trial</button>
+          <button class="btn" onclick="register()">Create Account & Add $10 Credit</button>
         </div>
 
         <!-- Login Form -->
@@ -615,7 +655,7 @@ app.get('/', (req, res) => {
 
       <div class="stats-grid">
         <div class="stat-card">
-          <div class="label">Total Spend</div>
+          <div class="label">Account Balance / Credit</div>
           <div class="value" id="stat-spend">$0.0000</div>
         </div>
         <div class="stat-card">
@@ -694,7 +734,7 @@ app.get('/', (req, res) => {
         document.getElementById('signup-box').classList.remove('hidden');
         document.getElementById('tab-su').classList.add('active');
         titleEl.innerText = "Create an account";
-        descEl.innerText = "Get started with your 7-day high-performance gateway trial.";
+        descEl.innerText = "Get started with your gateway account and $10 starting balance.";
       } else if(tab === 'login') {
         document.getElementById('login-box').classList.remove('hidden');
         document.getElementById('tab-li').classList.add('active');
@@ -813,7 +853,7 @@ app.get('/', (req, res) => {
           document.getElementById('stat-spend').innerText = '$' + data.currentSpendUSD.toFixed(4);
           const expires = new Date(data.trialExpiresAt);
           const diffDays = Math.ceil((expires - new Date()) / (1000 * 60 * 60 * 24));
-          document.getElementById('stat-trial').innerText = diffDays > 0 ? diffDays + ' Days Remaining' : 'Expired';
+          document.getElementById('stat-trial').innerText = diffDays > 0 ? diffDays + ' Days Remaining' : 'Active Paid Tier';
 
           if(data.logs && data.logs.length > 0) {
             const tbody = document.getElementById('logs-table-body');
@@ -899,23 +939,17 @@ app.post('/register', async (req, res) => {
   const existingUser = db.prepare('SELECT * FROM clients WHERE email = ?').get(email);
   if (existingUser) return res.status(400).json({ error: 'Email already registered. Please sign in.' });
 
-  let grantTrial = true;
-  if (fingerprint) {
-    const deviceMatch = db.prepare('SELECT * FROM clients WHERE device_fingerprint = ?').get(fingerprint);
-    if (deviceMatch) grantTrial = false;
-  }
-
   const clientKey = `cg-${crypto.randomBytes(16).toString('hex')}`;
   const hashedPassword = await bcrypt.hash(password, 10);
-  const trialExpiresAt = new Date(Date.now() + (grantTrial ? 7 : 0) * 24 * 60 * 60 * 1000).toISOString();
-  const status = grantTrial ? 'trial' : 'expired';
-  const budgetUSD = grantTrial ? 0.50 : 0.00;
+  const trialExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+  const status = 'active';
+  const initialCredit = 10.00;
 
   try {
     db.prepare(`
       INSERT INTO clients (client_key, id, email, password_hash, device_fingerprint, budget_usd, current_spend_usd, trial_expires_at, status)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(clientKey, email.split('@')[0], email, hashedPassword, fingerprint || 'unknown', budgetUSD, 0.0, trialExpiresAt, status);
+    `).run(clientKey, email.split('@')[0], email, hashedPassword, fingerprint || 'unknown', initialCredit, initialCredit, trialExpiresAt, status);
 
     res.json({ success: true, apiKey: clientKey });
   } catch (err) {
@@ -974,7 +1008,7 @@ app.all(/.*/, async (req, res) => {
     statusCode = response.status;
 
     if (response.ok) {
-      const newSpend = req.clientConfig.current_spend_usd + cost;
+      const newSpend = Math.max(0, req.clientConfig.current_spend_usd - cost);
       db.prepare('UPDATE clients SET current_spend_usd = ? WHERE client_key = ?').run(newSpend, req.clientConfig.client_key);
     }
 
