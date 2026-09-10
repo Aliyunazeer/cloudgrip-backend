@@ -994,13 +994,17 @@ app.get('/', (req, res) => {
     function updateLogsTable(logs) {
       const tbody = document.getElementById('logs-table-body');
       tbody.innerHTML = logs.map(log => `
+        function updateLogsTable(logs) {
+      const tbody = document.getElementById('logs-table-body');
+      tbody.innerHTML = logs.map(log => `
         <tr>
           <td>${log.timestamp}</td>
           <td>${log.method}</td>
           <td>${log.endpoint}</td>
-          <td><span class="status-badge ${log.status_code === 200 ? 'status-200' : 'status-err'}">${log.status_code}</span></td>
-          <td>$${log.cost.toFixed(4)}</td>
+          <td><span class="status-badge ${log.status_code === 200 ? 'status-200' : 'status-err'}">${log.status_code}</span></td>           <td>$${log.cost.toFixed(4)}</td>
         </tr>
+      `).join('');
+    }
       `).join('');
     }
 
