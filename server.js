@@ -10,7 +10,7 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const telemetryEmitter = new EventEmitter();
 
-const db = new Database('cloudgrip.db');
+const db = new Database('/tmp/cloudgrip.db');
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS clients (
