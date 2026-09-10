@@ -41,41 +41,52 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 app.get('/', (req, res) => {
   res.send(`<!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CloudGrip AI — High-Performance LLM Proxy Engine</title>
+  <title>CloudGrip — High-Performance LLM Proxy & Anti-Abuse Gateway</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #060911;
-      --card-bg: #0d1322;
-      --sidebar-bg: #0a0e19;
-      --border: #1e293b;
+      --bg: #090a0f;
+      --card-bg: #0f1117;
+      --card-hover: #141721;
+      --border: rgba(255, 255, 255, 0.08);
+      --border-hover: rgba(255, 255, 255, 0.16);
       --border-focus: #3b82f6;
-      --text: #f1f5f9;
-      --text-muted: #64748b;
-      --primary: #3b82f6;
-      --primary-hover: #2563eb;
+      --text: #f3f4f6;
+      --text-muted: #9ca3af;
+      --text-dim: #6b7280;
+      --primary: #ffffff;
+      --primary-hover: #e5e7eb;
+      --primary-text: #090a0f;
       --accent: #10b981;
-      --error-bg: rgba(239, 68, 68, 0.1);
+      --accent-glow: rgba(16, 185, 129, 0.15);
+      --error-bg: rgba(239, 68, 68, 0.08);
+      --error-border: rgba(239, 68, 68, 0.2);
       --error-text: #f87171;
-      --success-bg: rgba(16, 185, 129, 0.1);
+      --success-bg: rgba(16, 185, 129, 0.08);
       --success-text: #34d399;
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 14px;
+      --transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       background-color: var(--bg);
       color: var(--text);
       min-height: 100vh;
       display: flex;
       flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
     }
 
     /* Navbar */
@@ -83,30 +94,48 @@ app.get('/', (req, res) => {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 16px 32px;
+      height: 64px;
+      padding: 0 32px;
       border-bottom: 1px solid var(--border);
-      background: var(--sidebar-bg);
+      background: rgba(9, 10, 15, 0.75);
+      backdrop-filter: blur(12px);
+      position: sticky;
+      top: 0;
+      z-index: 50;
     }
 
     .nav-brand {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
+    }
+
+    .nav-brand svg {
+      width: 20px;
+      height: 20px;
+      color: #fff;
     }
 
     .nav-brand h1 {
-      font-size: 18px;
-      font-weight: 700;
+      font-size: 14px;
+      font-weight: 600;
       color: #fff;
-      letter-spacing: -0.5px;
+      letter-spacing: -0.2px;
+    }
+
+    .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
     }
 
     .badge-status {
-      display: flex;
+      display: inline-flex;
       align-items: center;
       gap: 6px;
       font-size: 12px;
-      color: var(--accent);
+      font-weight: 500;
+      color: var(--success-text);
       background: var(--success-bg);
       padding: 4px 10px;
       border-radius: 20px;
@@ -114,8 +143,8 @@ app.get('/', (req, res) => {
     }
 
     .pulse {
-      width: 8px;
-      height: 8px;
+      width: 6px;
+      height: 6px;
       background: var(--accent);
       border-radius: 50%;
       box-shadow: 0 0 8px var(--accent);
@@ -124,31 +153,54 @@ app.get('/', (req, res) => {
     /* Main Container */
     .main-content {
       flex: 1;
-      padding: 32px;
-      max-width: 1280px;
+      padding: 48px 24px;
+      max-width: 1200px;
       width: 100%;
       margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
     }
 
     /* Auth Wrapper */
     .auth-wrapper {
-      max-width: 440px;
-      margin: 60px auto;
+      max-width: 380px;
+      width: 100%;
+      margin: 0 auto;
     }
 
     .card {
       background: var(--card-bg);
       border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 32px;
-      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+      border-radius: var(--radius-lg);
+      padding: 28px;
+      box-shadow: 0 4px 24px -2px rgba(0, 0, 0, 0.5);
+      transition: var(--transition);
+    }
+
+    .card-header {
+      margin-bottom: 24px;
+    }
+
+    .card-header h2 {
+      font-size: 18px;
+      font-weight: 600;
+      color: #fff;
+      letter-spacing: -0.3px;
+      margin-bottom: 6px;
+    }
+
+    .card-header p {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.4;
     }
 
     .tabs {
       display: flex;
-      background: rgba(0, 0, 0, 0.3);
-      padding: 4px;
-      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.03);
+      padding: 3px;
+      border-radius: var(--radius-md);
       margin-bottom: 24px;
       border: 1px solid var(--border);
     }
@@ -156,22 +208,28 @@ app.get('/', (req, res) => {
     .tab {
       flex: 1;
       text-align: center;
-      padding: 10px;
+      padding: 7px;
       font-size: 13px;
-      font-weight: 600;
+      font-weight: 500;
       color: var(--text-muted);
       cursor: pointer;
-      border-radius: 8px;
-      transition: all 0.2s ease;
+      border-radius: 7px;
+      transition: var(--transition);
+    }
+
+    .tab:hover {
+      color: var(--text);
     }
 
     .tab.active {
-      background: var(--primary);
+      background: rgba(255, 255, 255, 0.08);
       color: #fff;
+      font-weight: 600;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
     }
 
     .form-group {
-      margin-bottom: 18px;
+      margin-bottom: 16px;
     }
 
     label {
@@ -180,204 +238,308 @@ app.get('/', (req, res) => {
       font-weight: 500;
       color: var(--text-muted);
       margin-bottom: 6px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
+      letter-spacing: -0.1px;
     }
 
     input {
       width: 100%;
-      padding: 12px 16px;
-      background: #04060b;
+      height: 38px;
+      padding: 0 12px;
+      background: #06070a;
       border: 1px solid var(--border);
-      border-radius: 10px;
+      border-radius: var(--radius-sm);
       color: #fff;
-      font-size: 14px;
+      font-size: 13px;
       font-family: inherit;
-      transition: border-color 0.2s;
+      transition: var(--transition);
+    }
+
+    input:hover {
+      border-color: var(--border-hover);
     }
 
     input:focus {
       outline: none;
-      border-color: var(--border-focus);
-      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+      border-color: #fff;
+      box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.15);
     }
 
     .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       width: 100%;
-      padding: 12px;
+      height: 38px;
       background: var(--primary);
-      color: #fff;
-      font-size: 14px;
-      font-weight: 600;
+      color: var(--primary-text);
+      font-size: 13px;
+      font-weight: 500;
       border: none;
-      border-radius: 10px;
+      border-radius: var(--radius-sm);
       cursor: pointer;
-      transition: background 0.2s;
-      margin-top: 8px;
+      transition: var(--transition);
+      margin-top: 6px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
     }
 
-    .btn:hover { background: var(--primary-hover); }
+    .btn:hover {
+      background: var(--primary-hover);
+      transform: translateY(-0.5px);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+    }
 
     .btn-secondary {
       background: transparent;
-      color: var(--text-muted);
+      color: var(--text);
       border: 1px solid var(--border);
-      margin-top: 10px;
+      margin-top: 8px;
     }
-    .btn-secondary:hover { background: rgba(255,255,255,0.02); color: #fff; }
+    
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: var(--border-hover);
+      color: #fff;
+    }
 
     .btn-danger {
-      background: #ef4444;
+      background: rgba(239, 68, 68, 0.1);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.2);
     }
-    .btn-danger:hover { background: #dc2626; }
+    .btn-danger:hover {
+      background: rgba(239, 68, 68, 0.15);
+      color: #fca5a5;
+    }
 
     .hidden { display: none !important; }
 
     .error-box {
       background: var(--error-bg);
-      border: 1px solid rgba(239, 68, 68, 0.2);
+      border: 1px solid var(--error-border);
       color: var(--error-text);
-      padding: 10px 14px;
-      border-radius: 8px;
-      font-size: 13px;
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
       margin-bottom: 16px;
+      line-height: 1.4;
     }
 
     .success-box {
       background: var(--success-bg);
       border: 1px solid rgba(16, 185, 129, 0.2);
       color: var(--success-text);
-      padding: 10px 14px;
-      border-radius: 8px;
-      font-size: 13px;
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
       margin-bottom: 16px;
+      line-height: 1.4;
     }
 
-    /* Full Dashboard View */
+    /* Dashboard View */
+    .dashboard-container {
+      width: 100%;
+      animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
     .dashboard-header {
       display: flex;
       justify-content: space-between;
-      align-items: center;
+      align-items: flex-end;
       margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
     }
 
     .dashboard-header h2 {
-      font-size: 24px;
-      font-weight: 700;
+      font-size: 20px;
+      font-weight: 600;
       color: #fff;
+      letter-spacing: -0.4px;
+      margin-bottom: 4px;
+    }
+
+    .dashboard-header p {
+      font-size: 13px;
+      color: var(--text-muted);
     }
 
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
       gap: 16px;
-      margin-bottom: 24px;
+      margin-bottom: 20px;
     }
 
     .stat-card {
       background: var(--card-bg);
       border: 1px solid var(--border);
       padding: 20px;
-      border-radius: 12px;
+      border-radius: var(--radius-md);
+      transition: var(--transition);
+    }
+
+    .stat-card:hover {
+      border-color: var(--border-hover);
     }
 
     .stat-card .label {
       font-size: 12px;
+      font-weight: 500;
       color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
       margin-bottom: 8px;
+      letter-spacing: -0.1px;
     }
 
     .stat-card .value {
-      font-size: 22px;
-      font-weight: 700;
+      font-size: 24px;
+      font-weight: 600;
       color: #fff;
       font-family: 'JetBrains Mono', monospace;
+      letter-spacing: -0.5px;
     }
 
     .panel {
       background: var(--card-bg);
       border: 1px solid var(--border);
-      border-radius: 12px;
+      border-radius: var(--radius-md);
       padding: 24px;
-      margin-bottom: 24px;
+      margin-bottom: 20px;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
     }
 
     .panel h3 {
-      font-size: 16px;
+      font-size: 14px;
       font-weight: 600;
       color: #fff;
+      letter-spacing: -0.2px;
+    }
+
+    .panel p {
+      font-size: 13px;
+      color: var(--text-muted);
       margin-bottom: 16px;
+      line-height: 1.4;
     }
 
     .key-row {
       display: flex;
-      gap: 12px;
+      gap: 10px;
       align-items: center;
     }
 
     .key-box {
       flex: 1;
-      background: #04060b;
+      height: 38px;
+      background: #06070a;
       border: 1px solid var(--border);
-      padding: 12px 16px;
-      border-radius: 8px;
+      padding: 0 12px;
+      display: flex;
+      align-items: center;
+      border-radius: var(--radius-sm);
       font-family: 'JetBrains Mono', monospace;
-      font-size: 13px;
-      color: #38bdf8;
+      font-size: 12px;
+      color: #60a5fa;
       overflow: hidden;
       text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
-    /* Logs Table */
+    /* Table */
+    .table-container {
+      width: 100%;
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: #06070a;
+    }
+
     table {
       width: 100%;
       border-collapse: collapse;
       text-align: left;
-      font-size: 13px;
+      font-size: 12px;
+      white-space: nowrap;
     }
 
     th {
       color: var(--text-muted);
-      font-weight: 600;
-      padding: 10px 12px;
+      font-weight: 500;
+      padding: 10px 14px;
       border-bottom: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.01);
+      letter-spacing: -0.1px;
     }
 
     td {
-      padding: 12px;
+      padding: 12px 14px;
       border-bottom: 1px solid var(--border);
       font-family: 'JetBrains Mono', monospace;
+      color: var(--text);
+    }
+
+    tr:last-child td {
+      border-bottom: none;
     }
 
     .status-badge {
+      display: inline-flex;
+      align-items: center;
       padding: 2px 6px;
       border-radius: 4px;
       font-size: 11px;
-      font-weight: bold;
+      font-weight: 500;
     }
-    .status-200 { background: rgba(16,185,129,0.1); color: #34d399; }
-    .status-err { background: rgba(239,68,68,0.1); color: #f87171; }
+    .status-200 { background: rgba(16,185,129,0.1); color: #34d399; border: 1px solid rgba(16,185,129,0.2); }
+    .status-err { background: rgba(239,68,68,0.1); color: #f87171; border: 1px solid rgba(239,68,68,0.2); }
 
     .auth-footer {
       display: flex;
-      justify-content: space-between;
+      justify-content: flex-end;
       font-size: 12px;
-      margin-top: 12px;
+      margin-top: 10px;
     }
-    .auth-footer a { color: var(--primary); text-decoration: none; cursor: pointer; }
-    .auth-footer a:hover { text-decoration: underline; }
+    .auth-footer a { color: var(--text-muted); text-decoration: none; cursor: pointer; transition: var(--transition); }
+    .auth-footer a:hover { color: #fff; }
+
+    /* Footer Meta */
+    .site-footer {
+      padding: 24px 32px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+    .site-footer a { color: var(--text-muted); text-decoration: none; margin-left: 16px; }
+    .site-footer a:hover { color: #fff; }
   </style>
 </head>
 <body>
 
   <nav>
     <div class="nav-brand">
-      <h1>CloudGrip AI Engine</h1>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      <h1>CloudGrip Gateway</h1>
     </div>
-    <div class="badge-status">
-      <div class="pulse"></div> Gateway Operational
+    <div class="nav-right">
+      <div class="badge-status">
+        <div class="pulse"></div> Operational
+      </div>
     </div>
   </nav>
 
@@ -386,38 +548,43 @@ app.get('/', (req, res) => {
     <!-- Auth Section -->
     <div id="auth-container" class="auth-wrapper">
       <div class="card">
+        <div id="auth-header-el" class="card-header">
+          <h2 id="auth-title">Welcome back</h2>
+          <p id="auth-desc">Enter your credentials to access your gateway control panel.</p>
+        </div>
+
         <div class="tabs">
-          <div class="tab active" id="tab-su" onclick="switchTab('signup')">Sign Up</div>
-          <div class="tab" id="tab-li" onclick="switchTab('login')">Log In</div>
+          <div class="tab" id="tab-su" onclick="switchTab('signup')">Sign Up</div>
+          <div class="tab active" id="tab-li" onclick="switchTab('login')">Log In</div>
         </div>
 
         <div id="error-msg" class="error-box hidden"></div>
         <div id="success-msg" class="success-box hidden"></div>
 
         <!-- Signup Form -->
-        <div id="signup-box">
+        <div id="signup-box" class="hidden">
           <div class="form-group">
-            <label>Email Address</label>
-            <input type="email" id="su-email" placeholder="name@example.com">
+            <label>Work Email</label>
+            <input type="email" id="su-email" placeholder="name@company.com">
           </div>
           <div class="form-group">
             <label>Password</label>
-            <input type="password" id="su-pass" placeholder="Create secure password">
+            <input type="password" id="su-pass" placeholder="Create a secure password">
           </div>
           <button class="btn" onclick="register()">Create Account & Start Trial</button>
         </div>
 
         <!-- Login Form -->
-        <div id="login-box" class="hidden">
+        <div id="login-box">
           <div class="form-group">
-            <label>Email Address</label>
-            <input type="email" id="li-email" placeholder="name@example.com">
+            <label>Work Email</label>
+            <input type="email" id="li-email" placeholder="name@company.com">
           </div>
           <div class="form-group">
             <label>Password</label>
-            <input type="password" id="li-pass" placeholder="Enter password">
+            <input type="password" id="li-pass" placeholder="••••••••••••">
           </div>
-          <button class="btn" onclick="login()">Access Gateway</button>
+          <button class="btn" onclick="login()">Sign In</button>
           <div class="auth-footer">
             <a onclick="switchTab('forgot')">Forgot password?</a>
           </div>
@@ -425,28 +592,30 @@ app.get('/', (req, res) => {
 
         <!-- Forgot Password Form -->
         <div id="forgot-box" class="hidden">
-          <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">Enter your registered email address and we'll dispatch your credentials or reset info.</p>
           <div class="form-group">
-            <label>Email Address</label>
-            <input type="email" id="fg-email" placeholder="name@example.com">
+            <label>Work Email</label>
+            <input type="email" id="fg-email" placeholder="name@company.com">
           </div>
-          <button class="btn" onclick="forgotPassword()">Recover Password</button>
-          <button class="btn btn-secondary" onclick="switchTab('login')">Back to Login</button>
+          <button class="btn" onclick="forgotPassword()">Send Reset Instructions</button>
+          <button class="btn btn-secondary" onclick="switchTab('login')">Back to Sign In</button>
         </div>
 
       </div>
     </div>
 
     <!-- Full Dashboard View -->
-    <div id="dashboard" class="hidden">
+    <div id="dashboard" class="dashboard-container hidden">
       <div class="dashboard-header">
-        <h2>Gateway Control Panel</h2>
-        <button class="btn btn-danger" style="width: auto; padding: 10px 20px; margin: 0;" onclick="logout()">Sign Out</button>
+        <div>
+          <h2>Overview</h2>
+          <p>Real-time analytics and proxy performance metrics.</p>
+        </div>
+        <button class="btn btn-danger" style="width: auto; padding: 0 16px; margin: 0;" onclick="logout()">Sign Out</button>
       </div>
 
       <div class="stats-grid">
         <div class="stat-card">
-          <div class="label">Total Spend (USD)</div>
+          <div class="label">Total Spend</div>
           <div class="value" id="stat-spend">$0.0000</div>
         </div>
         <div class="stat-card">
@@ -454,43 +623,55 @@ app.get('/', (req, res) => {
           <div class="value" id="stat-trial">-</div>
         </div>
         <div class="stat-card">
-          <div class="label">Gateway Status</div>
-          <div class="value" style="color: var(--accent);">Active</div>
+          <div class="label">Gateway State</div>
+          <div class="value" style="color: var(--success-text); font-size: 18px; display: flex; align-items: center; height: 32px;">Active Proxy</div>
         </div>
       </div>
 
       <div class="panel">
         <h3>API Authentication Key</h3>
+        <p>Include this key in your request headers via <code>x-cloudgrip-key</code> to authenticate traffic through the proxy layer.</p>
         <div class="key-row">
           <div class="key-box" id="res-key"></div>
-          <button class="btn" style="width: 140px; margin:0;" onclick="copyKey()">Copy Key</button>
+          <button class="btn" style="width: 110px; margin:0;" onclick="copyKey()">Copy Key</button>
         </div>
       </div>
 
       <div class="panel">
-        <h3>Live Request Activity Logs</h3>
-        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">Real-time feed of traffic passing through your CloudGrip proxy gateway.</p>
-        <table>
-          <thead>
-            <tr>
-              <th>Timestamp</th>
-              <th>Method</th>
-              <th>Endpoint</th>
-              <th>Status</th>
-              <th>Cost</th>
-            </tr>
-          </thead>
-          <tbody id="logs-table-body">
-            <tr><td colspan="5" style="text-align: center; color: var(--text-muted);">No proxy requests logged yet. Make a request using your API key!</td></tr>
-          </tbody>
-        </table>
+        <div class="panel-header">
+          <h3>Request Activity Logs</h3>
+          <span style="font-size: 12px; color: var(--text-muted);">Last 10 proxy calls</span>
+        </div>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>Method</th>
+                <th>Endpoint</th>
+                <th>Status</th>
+                <th>Cost</th>
+              </tr>
+            </thead>
+            <tbody id="logs-table-body">
+              <tr><td colspan="5" style="text-align: center; color: var(--text-muted); font-family: inherit; padding: 24px;">No proxy traffic recorded yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
 
   </div>
 
+  <footer class="site-footer">
+    <div>&copy; 2026 CloudGrip AI, Inc. All rights reserved.</div>
+    <div>
+      <a href="/terms">Terms</a>
+      <a href="/privacy">Privacy</a>
+    </div>
+  </footer>
+
   <script>
-    // Auto-login if key is already in localStorage
     window.onload = async () => {
       const savedKey = localStorage.getItem('cloudgrip_key');
       if (savedKey) {
@@ -506,14 +687,23 @@ app.get('/', (req, res) => {
       document.getElementById('tab-li').classList.remove('active');
       hideMsg();
 
+      const titleEl = document.getElementById('auth-title');
+      const descEl = document.getElementById('auth-desc');
+
       if(tab === 'signup') {
         document.getElementById('signup-box').classList.remove('hidden');
         document.getElementById('tab-su').classList.add('active');
+        titleEl.innerText = "Create an account";
+        descEl.innerText = "Get started with your 7-day high-performance gateway trial.";
       } else if(tab === 'login') {
         document.getElementById('login-box').classList.remove('hidden');
         document.getElementById('tab-li').classList.add('active');
+        titleEl.innerText = "Welcome back";
+        descEl.innerText = "Enter your credentials to access your gateway control panel.";
       } else if(tab === 'forgot') {
         document.getElementById('forgot-box').classList.remove('hidden');
+        titleEl.innerText = "Reset password";
+        descEl.innerText = "Enter your registered email to receive recovery instructions.";
       }
     }
 
@@ -542,7 +732,7 @@ app.get('/', (req, res) => {
       const password = document.getElementById('su-pass').value;
       const fingerprint = navigator.userAgent + screen.width + screen.height;
       
-      if(!email || !password) return showError('Please fill in all fields.');
+      if(!email || !password) return showError('All fields are required.');
 
       try {
         const res = await fetch('/register', {
@@ -567,7 +757,7 @@ app.get('/', (req, res) => {
       const email = document.getElementById('li-email').value.trim();
       const password = document.getElementById('li-pass').value;
       
-      if(!email || !password) return showError('Please enter login credentials.');
+      if(!email || !password) return showError('Please provide your login credentials.');
 
       try {
         const res = await fetch('/login', {
@@ -580,7 +770,7 @@ app.get('/', (req, res) => {
           localStorage.setItem('cloudgrip_key', data.apiKey);
           await loadDashboard(data.apiKey);
         } else {
-          showError(data.error || 'Invalid login details.');
+          showError(data.error || 'Invalid email or password.');
         }
       } catch (err) {
         showError('Network connectivity error.');
@@ -623,9 +813,8 @@ app.get('/', (req, res) => {
           document.getElementById('stat-spend').innerText = '$' + data.currentSpendUSD.toFixed(4);
           const expires = new Date(data.trialExpiresAt);
           const diffDays = Math.ceil((expires - new Date()) / (1000 * 60 * 60 * 24));
-          document.getElementById('stat-trial').innerText = diffDays > 0 ? diffDays + ' Days Left' : 'Expired';
+          document.getElementById('stat-trial').innerText = diffDays > 0 ? diffDays + ' Days Remaining' : 'Expired';
 
-          // Render Logs
           if(data.logs && data.logs.length > 0) {
             const tbody = document.getElementById('logs-table-body');
             tbody.innerHTML = data.logs.map(log => \`
@@ -642,14 +831,17 @@ app.get('/', (req, res) => {
           logout();
         }
       } catch(e) {
-        console.error('Failed fetching telemetry', e);
+        console.error('Failed fetching stats', e);
       }
     }
 
     function copyKey() {
       const key = document.getElementById('res-key').innerText;
       navigator.clipboard.writeText(key);
-      alert('API Key copied to clipboard!');
+      const btn = event.target;
+      const originalText = btn.innerText;
+      btn.innerText = 'Copied!';
+      setTimeout(() => btn.innerText = originalText, 1500);
     }
 
     function logout() {
@@ -662,11 +854,11 @@ app.get('/', (req, res) => {
 });
 
 app.get('/terms', (req, res) => {
-  res.send(`<!DOCTYPE html><html><head><title>Terms - CloudGrip AI</title><style>body{font-family:sans-serif;background:#060911;color:#f1f5f9;padding:40px;max-width:700px;margin:auto;line-height:1.6}h1{color:#38bdf8}</style></head><body><h1>Terms of Service</h1><p>Welcome to CloudGrip AI. You agree to utilize this gateway lawfully.</p></body></html>`);
+  res.send(`<!DOCTYPE html><html><head><title>Terms - CloudGrip AI</title><style>body{font-family:Inter,sans-serif;background:#090a0f;color:#f3f4f6;padding:60px 24px;max-width:700px;margin:auto;line-height:1.6}h1{font-size:24px;color:#fff;margin-bottom:16px}p{font-size:14px;color:#9ca3af}</style></head><body><h1>Terms of Service</h1><p>Welcome to CloudGrip AI. You agree to utilize this gateway infrastructure lawfully and securely.</p></body></html>`);
 });
 
 app.get('/privacy', (req, res) => {
-  res.send(`<!DOCTYPE html><html><head><title>Privacy - CloudGrip AI</title><style>body{font-family:sans-serif;background:#060911;color:#f1f5f9;padding:40px;max-width:700px;margin:auto;line-height:1.6}h1{color:#38bdf8}</style></head><body><h1>Privacy Policy</h1><p>We protect your credential integrity and process traffic securely.</p></body></html>`);
+  res.send(`<!DOCTYPE html><html><head><title>Privacy - CloudGrip AI</title><style>body{font-family:Inter,sans-serif;background:#090a0f;color:#f3f4f6;padding:60px 24px;max-width:700px;margin:auto;line-height:1.6}h1{font-size:24px;color:#fff;margin-bottom:16px}p{font-size:14px;color:#9ca3af}</style></head><body><h1>Privacy Policy</h1><p>We protect your credential integrity and process telemetry traffic with maximum security protocols.</p></body></html>`);
 });
 
 app.post('/forgot-password', (req, res) => {
@@ -675,10 +867,9 @@ app.post('/forgot-password', (req, res) => {
   if (!user) {
     return res.status(404).json({ error: 'No account found with this email address.' });
   }
-  // In production, this would trigger SendGrid/Resend. For now, return confirmation.
   res.json({
     success: true,
-    message: 'Password recovery instructions have been dispatched to your email address.'
+    message: 'Password reset instructions have been dispatched to your email.'
   });
 });
 
@@ -706,7 +897,7 @@ app.post('/register', async (req, res) => {
   if (!email || !password) return res.status(400).json({ error: 'Email and password required.' });
 
   const existingUser = db.prepare('SELECT * FROM clients WHERE email = ?').get(email);
-  if (existingUser) return res.status(400).json({ error: 'Email already registered. Please log in.' });
+  if (existingUser) return res.status(400).json({ error: 'Email already registered. Please sign in.' });
 
   let grantTrial = true;
   if (fingerprint) {
@@ -759,7 +950,6 @@ app.use((req, res, next) => {
 app.all(/.*/, async (req, res) => {
   if (['/', '/register', '/login', '/events', '/terms', '/privacy', '/client/stats', '/forgot-password'].includes(req.path)) return;
 
-  const startTime = Date.now();
   let statusCode = 502;
   let cost = 0.01;
 
@@ -788,7 +978,6 @@ app.all(/.*/, async (req, res) => {
       db.prepare('UPDATE clients SET current_spend_usd = ? WHERE client_key = ?').run(newSpend, req.clientConfig.client_key);
     }
 
-    // Log the request
     db.prepare('INSERT INTO request_logs (client_key, method, endpoint, status_code, cost) VALUES (?, ?, ?, ?, ?)').run(
       req.clientConfig.client_key, req.method, req.originalUrl, statusCode, cost
     );
