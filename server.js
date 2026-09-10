@@ -34,110 +34,388 @@ app.get('/', (req, res) => {
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>CloudGrip AI - High-Speed LLM Proxy</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CloudGrip AI — High-Speed LLM Proxy Engine</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
-    body { font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 40px; display: flex; justify-content: center; }
-    .container { max-width: 600px; width: 100%; background: #1e293b; padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
-    h1 { color: #38bdf8; margin-top: 0; font-size: 24px; }
-    .price-tag { font-size: 28px; font-weight: bold; color: #4ade80; margin: 15px 0; }
-    input, button { width: 100%; padding: 12px; margin: 8px 0 16px 0; border-radius: 6px; border: 1px solid #475569; background: #0f172a; color: #fff; box-sizing: border-box; }
-    button { background: #38bdf8; color: #0f172a; font-weight: bold; border: none; cursor: pointer; }
-    button:hover { background: #0ea5e9; }
-    .hidden { display: none; }
-    pre { background: #0f172a; padding: 15px; border-radius: 6px; overflow-x: auto; color: #38bdf8; }
-    .tab { cursor: pointer; padding: 10px 20px; display: inline-block; background: #334155; margin-right: 5px; border-radius: 6px 6px 0 0; }
-    .tab.active { background: #1e293b; color: #38bdf8; font-weight: bold; }
+    :root {
+      --bg: #090d16;
+      --card-bg: #111827;
+      --border: #1f2937;
+      --border-focus: #3b82f6;
+      --text: #f3f4f6;
+      --text-muted: #9ca3af;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --accent: #10b981;
+      --error-bg: rgba(239, 68, 68, 0.1);
+      --error-text: #f87171;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background-image: radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.08) 0%, transparent 50%);
+    }
+
+    .wrapper {
+      width: 100%;
+      max-width: 440px;
+    }
+
+    .brand {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    .brand h1 {
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: #fff;
+    }
+
+    .brand p {
+      color: var(--text-muted);
+      font-size: 14px;
+      margin-top: 6px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 32px;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+    }
+
+    .tabs {
+      display: flex;
+      background: rgba(0, 0, 0, 0.2);
+      padding: 4px;
+      border-radius: 10px;
+      margin-bottom: 24px;
+      border: 1px solid var(--border);
+    }
+
+    .tab {
+      flex: 1;
+      text-align: center;
+      padding: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      border-radius: 8px;
+      transition: all 0.2s ease;
+    }
+
+    .tab.active {
+      background: var(--primary);
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    }
+
+    .pricing-banner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(16, 185, 129, 0.05);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+      padding: 12px 16px;
+      border-radius: 10px;
+      margin-bottom: 24px;
+    }
+
+    .pricing-banner .plan {
+      font-size: 13px;
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .pricing-banner .price {
+      font-size: 16px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .form-group {
+      margin-bottom: 18px;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    input {
+      width: 100%;
+      padding: 12px 16px;
+      background: #0b0f19;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: #fff;
+      font-size: 14px;
+      font-family: inherit;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+    }
+
+    .btn {
+      width: 100%;
+      padding: 12px;
+      background: var(--primary);
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      margin-top: 8px;
+    }
+
+    .btn:hover { background: var(--primary-hover); }
+    .btn:active { transform: scale(0.99); }
+
+    .btn-danger {
+      background: #ef4444;
+      margin-top: 16px;
+    }
+    .btn-danger:hover { background: #dc2626; }
+
+    .hidden { display: none !important; }
+
+    .error-box {
+      background: var(--error-bg);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      color: var(--error-text);
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-bottom: 16px;
+    }
+
+    .dashboard-view h3 {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #fff;
+    }
+
+    .dashboard-view p {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+
+    .key-box {
+      background: #0b0f19;
+      border: 1px solid var(--border);
+      padding: 14px;
+      border-radius: 10px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      color: #38bdf8;
+      word-break: break-all;
+      margin-bottom: 16px;
+    }
+
+    .instruction-note {
+      font-size: 12px;
+      color: var(--text-muted);
+      background: rgba(255, 255, 255, 0.02);
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      line-height: 1.5;
+    }
+
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      color: #38bdf8;
+      background: rgba(56, 189, 248, 0.1);
+      padding: 2px 4px;
+      border-radius: 4px;
+    }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>CloudGrip AI Proxy Engine</h1>
-    <div class="price-tag">$10 / month <span style="font-size: 14px; color: #94a3b8; font-weight: normal;">(Includes 7-Day Free Trial)</span></div>
-    
-    <div>
-      <span class="tab active" onclick="switchTab('signup')">Sign Up</span>
-      <span class="tab" onclick="switchTab('login')">Log In</span>
+
+  <div class="wrapper">
+    <div class="brand">
+      <h1>CloudGrip AI</h1>
+      <p>High-Performance LLM Proxy & Anti-Abuse Gateway</p>
     </div>
 
-    <div id="signup-box" style="background: #1e293b; padding-top: 15px;">
-      <p style="color: #94a3b8; font-size: 14px;">Create your account to instantly claim your 7-day trial key.</p>
-      <input type="email" id="su-email" placeholder="Email Address">
-      <input type="password" id="su-pass" placeholder="Password">
-      <button onclick="register()">Start 7-Day Free Trial</button>
-    </div>
+    <div class="card">
+      <div id="auth-container">
+        <div class="tabs">
+          <div class="tab active" onclick="switchTab('signup')">Sign Up</div>
+          <div class="tab" onclick="switchTab('login')">Log In</div>
+        </div>
 
-    <div id="login-box" class="hidden" style="background: #1e293b; padding-top: 15px;">
-      <input type="email" id="li-email" placeholder="Email Address">
-      <input type="password" id="li-pass" placeholder="Password">
-      <button onclick="login()">Access Dashboard & Key</button>
-    </div>
+        <div class="pricing-banner">
+          <span class="plan">⚡ 7-Day Free Trial Included</span>
+          <span class="price">$10<span style="font-size:12px; color:var(--text-muted); font-weight:normal;">/mo</span></span>
+        </div>
 
-    <div id="dashboard" class="hidden">
-      <h3>Your Active API Credentials</h3>
-      <p><strong>API Key:</strong></p>
-      <pre id="res-key"></pre>
-      <p><strong>How to use in your code / apps:</strong></p>
-      <p style="font-size: 13px; color: #94a3b8;">Point your base URL to this server and use header <code>x-cloudgrip-key</code>.</p>
-      <button style="background: #ef4444; color: #fff;" onclick="logout()">Log Out</button>
+        <div id="error-msg" class="error-box hidden"></div>
+
+        <!-- Signup Form -->
+        <div id="signup-box">
+          <div class="form-group">
+            <label>Email Address</label>
+            <input type="email" id="su-email" placeholder="name@example.com">
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" id="su-pass" placeholder="Create a secure password">
+          </div>
+          <button class="btn" onclick="register()">Create Account & Start Trial</button>
+          
+          <p style="font-size: 11px; color: var(--text-muted); margin-top: 12px; text-align: center; line-height: 1.4;">
+            By signing up, you agree to our <a href="/terms" target="_blank" style="color: var(--primary);">Terms of Service</a> and <a href="/privacy" target="_blank" style="color: var(--primary);">Privacy Policy</a>.
+          </p>
+        </div>
+
+        <!-- Login Form -->
+        <div id="login-box" class="hidden">
+          <div class="form-group">
+            <label>Email Address</label>
+            <input type="email" id="li-email" placeholder="name@example.com">
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" id="li-pass" placeholder="Enter your password">
+          </div>
+          <button class="btn" onclick="login()">Access Dashboard</button>
+        </div>
+      </div>
+
+      <!-- Dashboard View -->
+      <div id="dashboard" class="dashboard-view hidden">
+        <h3>API Credentials</h3>
+        <p>Keep your API key secure. Do not share it publicly.</p>
+        
+        <label>Your Unique API Key</label>
+        <div class="key-box" id="res-key"></div>
+
+        <div class="instruction-note">
+          <strong>Integration Tip:</strong> Point your application client base URL to this server and provide your key via the <code>x-cloudgrip-key</code> header.
+        </div>
+
+        <button class="btn btn-danger" onclick="logout()">Sign Out</button>
+      </div>
     </div>
-    <p id="error-msg" style="color: #f87171;"></p>
   </div>
 
   <script>
     function switchTab(tab) {
+      const suBox = document.getElementById('signup-box');
+      const liBox = document.getElementById('login-box');
+      const tabs = document.querySelectorAll('.tab');
+      hideError();
+
       if(tab === 'signup') {
-        document.getElementById('signup-box').classList.remove('hidden');
-        document.getElementById('login-box').classList.add('hidden');
-        document.querySelectorAll('.tab')[0].classList.add('active');
-        document.querySelectorAll('.tab')[1].classList.remove('active');
+        suBox.classList.remove('hidden');
+        liBox.classList.add('hidden');
+        tabs[0].classList.add('active');
+        tabs[1].classList.remove('active');
       } else {
-        document.getElementById('signup-box').classList.add('hidden');
-        document.getElementById('login-box').classList.remove('hidden');
-        document.querySelectorAll('.tab')[1].classList.add('active');
-        document.querySelectorAll('.tab')[0].classList.remove('active');
+        suBox.classList.add('hidden');
+        liBox.classList.remove('hidden');
+        tabs[1].classList.add('active');
+        tabs[0].classList.remove('active');
       }
     }
 
+    function showError(msg) {
+      const errBox = document.getElementById('error-msg');
+      errBox.innerText = msg;
+      errBox.classList.remove('hidden');
+    }
+
+    function hideError() {
+      document.getElementById('error-msg').classList.add('hidden');
+    }
+
     async function register() {
-      const email = document.getElementById('su-email').value;
+      hideError();
+      const email = document.getElementById('su-email').value.trim();
       const password = document.getElementById('su-pass').value;
       const fingerprint = navigator.userAgent + screen.width + screen.height;
       
-      const res = await fetch('/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, fingerprint })
-      });
-      const data = await res.json();
-      if(data.success) {
-        showDashboard(data.apiKey);
-      } else {
-        document.getElementById('error-msg').innerText = data.error;
+      if(!email || !password) {
+        showError('Please fill in all required fields.');
+        return;
+      }
+
+      try {
+        const res = await fetch('/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password, fingerprint })
+        });
+        const data = await res.json();
+        if(data.success) {
+          showDashboard(data.apiKey);
+        } else {
+          showError(data.error || 'Registration failed.');
+        }
+      } catch (err) {
+        showError('Network error. Please try again.');
       }
     }
 
     async function login() {
-      const email = document.getElementById('li-email').value;
+      hideError();
+      const email = document.getElementById('li-email').value.trim();
       const password = document.getElementById('li-pass').value;
       
-      const res = await fetch('/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      });
-      const data = await res.json();
-      if(data.success) {
-        showDashboard(data.apiKey);
-      } else {
-        document.getElementById('error-msg').innerText = data.error;
+      if(!email || !password) {
+        showError('Please fill in your login details.');
+        return;
+      }
+
+      try {
+        const res = await fetch('/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        const data = await res.json();
+        if(data.success) {
+          showDashboard(data.apiKey);
+        } else {
+          showError(data.error || 'Invalid credentials.');
+        }
+      } catch (err) {
+        showError('Network error. Please try again.');
       }
     }
 
     function showDashboard(key) {
-      document.getElementById('signup-box').classList.add('hidden');
-      document.getElementById('login-box').classList.add('hidden');
-      document.querySelectorAll('.tab')[0].style.display = 'none';
-      document.querySelectorAll('.tab')[1].style.display = 'none';
+      document.getElementById('auth-container').classList.add('hidden');
       document.getElementById('dashboard').classList.remove('hidden');
       document.getElementById('res-key').innerText = key;
     }
@@ -146,6 +424,14 @@ app.get('/', (req, res) => {
   </script>
 </body>
 </html>`);
+});
+
+app.get('/terms', (req, res) => {
+  res.send(`<!DOCTYPE html><html><head><title>Terms of Service - CloudGrip AI</title><style>body{font-family:sans-serif;background:#090d16;color:#f3f4f6;padding:40px;max-width:700px;margin:auto;line-height:1.6}h1{color:#38bdf8}</style></head><body><h1>Terms of Service</h1><p>Welcome to CloudGrip AI. By using our proxy service, you agree to use it legally and responsibly. Services are provided "as is" without warranty of any kind. We reserve the right to terminate API keys that abuse system resources or engage in malicious activity. We are not liable for any downtime or third-party API interruptions.</p></body></html>`);
+});
+
+app.get('/privacy', (req, res) => {
+  res.send(`<!DOCTYPE html><html><head><title>Privacy Policy - CloudGrip AI</title><style>body{font-family:sans-serif;background:#090d16;color:#f3f4f6;padding:40px;max-width:700px;margin:auto;line-height:1.6}h1{color:#38bdf8}</style></head><body><h1>Privacy Policy</h1><p>CloudGrip AI collects your email, encrypted passwords, and basic device information solely for authentication, session management, and preventing trial abuse. We do not sell or share your personal data with third parties.</p></body></html>`);
 });
 
 app.post('/register', async (req, res) => {
@@ -206,7 +492,7 @@ app.post('/login', async (req, res) => {
 });
 
 app.use((req, res, next) => {
-  if (req.path === '/events' || req.path === '/register' || req.path === '/login' || req.path === '/') return next();
+  if (['/events', '/register', '/login', '/', '/terms', '/privacy'].includes(req.path)) return next();
 
   const clientKey = req.headers['x-cloudgrip-key'] || req.query.cloudgrip_key;
   if (!clientKey) return res.status(401).json({ error: 'Unauthorized: Missing x-cloudgrip-key header' });
@@ -228,7 +514,7 @@ app.use((req, res, next) => {
 });
 
 app.all(/.*/, async (req, res) => {
-  if (['/', '/register', '/login', '/events'].includes(req.path)) return;
+  if (['/', '/register', '/login', '/events', '/terms', '/privacy'].includes(req.path)) return;
 
   try {
     const targetUrl = `https://generativelanguage.googleapis.com${req.originalUrl}`;
