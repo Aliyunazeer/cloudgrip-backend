@@ -71,7 +71,7 @@ app.get('/', (req, res) => {
 
     .wrapper {
       width: 100%;
-      max-width: 440px;
+      max-width: 480px;
     }
 
     .brand {
@@ -215,29 +215,58 @@ app.get('/', (req, res) => {
       margin-bottom: 16px;
     }
 
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .stat-card {
+      background: #0b0f19;
+      border: 1px solid var(--border);
+      padding: 14px;
+      border-radius: 10px;
+    }
+
+    .stat-card .label {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+
+    .stat-card .value {
+      font-size: 16px;
+      font-weight: 700;
+      color: #fff;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
     .dashboard-view h3 {
       font-size: 18px;
       font-weight: 600;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
       color: #fff;
     }
 
     .dashboard-view p {
       font-size: 13px;
       color: var(--text-muted);
-      margin-bottom: 16px;
+      margin-bottom: 20px;
     }
 
     .key-box {
       background: #0b0f19;
       border: 1px solid var(--border);
-      padding: 14px;
+      padding: 12px 14px;
       border-radius: 10px;
       font-family: 'JetBrains Mono', monospace;
       font-size: 13px;
       color: #38bdf8;
       word-break: break-all;
-      margin-bottom: 16px;
+      margin-bottom: 18px;
     }
 
     .instruction-note {
@@ -248,6 +277,7 @@ app.get('/', (req, res) => {
       border-radius: 8px;
       border: 1px solid var(--border);
       line-height: 1.5;
+      margin-bottom: 16px;
     }
 
     code {
@@ -275,7 +305,7 @@ app.get('/', (req, res) => {
         </div>
 
         <div class="pricing-banner">
-          <span class="plan">⚡ 7-Day Free Trial Included</span>
+          <span class="plan"> 7-Day Free Trial Included</span>
           <span class="price">$10<span style="font-size:12px; color:var(--text-muted); font-weight:normal;">/mo</span></span>
         </div>
 
@@ -314,14 +344,25 @@ app.get('/', (req, res) => {
 
       <!-- Dashboard View -->
       <div id="dashboard" class="dashboard-view hidden">
-        <h3>API Credentials</h3>
-        <p>Keep your API key secure. Do not share it publicly.</p>
+        <h3>Live Overview</h3>
+        <p>Monitor your token spending and active trial duration.</p>
         
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="label">Current Spend</div>
+            <div class="value" id="stat-spend">$0.00</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">Trial Time Left</div>
+            <div class="value" id="stat-trial">-</div>
+          </div>
+        </div>
+
         <label>Your Unique API Key</label>
         <div class="key-box" id="res-key"></div>
 
         <div class="instruction-note">
-          <strong>Integration Tip:</strong> Point your application client base URL to this server and provide your key via the <code>x-cloudgrip-key</code> header.
+          <strong>Integration Tip:</strong> Route your base URL to this server and provide your key via the <code>x-cloudgrip-key</code> header.
         </div>
 
         <button class="btn btn-danger" onclick="logout()">Sign Out</button>
@@ -414,10 +455,33 @@ app.get('/', (req, res) => {
       }
     }
 
-    function showDashboard(key) {
+    async function showDashboard(key) {
       document.getElementById('auth-container').classList.add('hidden');
       document.getElementById('dashboard').classList.remove('hidden');
       document.getElementById('res-key').innerText = key;
+
+      // Fetch live user stats
+      try {
+        const res = await fetch('/client/stats', {
+          headers: { 'x-cloudgrip-key': key }
+        });
+        const data = await res.json();
+        if(data.success) {
+          document.getElementById('stat-spend').innerText = '$' + data.currentSpendUSD.toFixed(4);
+          
+          const expires = new Date(data.trialExpiresAt);
+          const now = new Date();
+          const diffDays = Math.ceil((expires - now) / (1000 * 60 * 60 * 24));
+          
+          if(diffDays > 0) {
+            document.getElementById('stat-trial').innerText = diffDays + ' Days Left';
+          } else {
+            document.getElementById('stat-trial').innerText = 'Expired';
+          }
+        }
+      } catch(e) {
+        console.error('Failed to load stats', e);
+      }
     }
 
     function logout() { location.reload(); }
@@ -432,6 +496,22 @@ app.get('/terms', (req, res) => {
 
 app.get('/privacy', (req, res) => {
   res.send(`<!DOCTYPE html><html><head><title>Privacy Policy - CloudGrip AI</title><style>body{font-family:sans-serif;background:#090d16;color:#f3f4f6;padding:40px;max-width:700px;margin:auto;line-height:1.6}h1{color:#38bdf8}</style></head><body><h1>Privacy Policy</h1><p>CloudGrip AI collects your email, encrypted passwords, and basic device information solely for authentication, session management, and preventing trial abuse. We do not sell or share your personal data with third parties.</p></body></html>`);
+});
+
+app.get('/client/stats', (req, res) => {
+  const clientKey = req.headers['x-cloudgrip-key'] || req.query.cloudgrip_key;
+  if (!clientKey) return res.status(401).json({ error: 'Unauthorized: Missing key' });
+
+  const client = db.prepare('SELECT * FROM clients WHERE client_key = ?').get(clientKey);
+  if (!client) return res.status(403).json({ error: 'Forbidden: Invalid key' });
+
+  res.json({
+    success: true,
+    currentSpendUSD: client.current_spend_usd,
+    budgetUSD: client.budget_usd,
+    trialExpiresAt: client.trial_expires_at,
+    status: client.status
+  });
 });
 
 app.post('/register', async (req, res) => {
@@ -493,7 +573,7 @@ app.post('/login', async (req, res) => {
 });
 
 app.use((req, res, next) => {
-  if (['/events', '/register', '/login', '/', '/terms', '/privacy'].includes(req.path)) return next();
+  if (['/events', '/register', '/login', '/', '/terms', '/privacy', '/client/stats'].includes(req.path)) return next();
 
   const clientKey = req.headers['x-cloudgrip-key'] || req.query.cloudgrip_key;
   if (!clientKey) return res.status(401).json({ error: 'Unauthorized: Missing x-cloudgrip-key header' });
@@ -515,7 +595,7 @@ app.use((req, res, next) => {
 });
 
 app.all(/.*/, async (req, res) => {
-  if (['/', '/register', '/login', '/events', '/terms', '/privacy'].includes(req.path)) return;
+  if (['/', '/register', '/login', '/events', '/terms', '/privacy', '/client/stats'].includes(req.path)) return;
 
   try {
     const targetUrl = `https://generativelanguage.googleapis.com${req.originalUrl}`;
