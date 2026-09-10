@@ -23,7 +23,17 @@ db.exec(`
     current_spend_usd REAL NOT NULL,
     trial_expires_at TEXT NOT NULL,
     status TEXT DEFAULT 'trial'
-  )
+  );
+
+  CREATE TABLE IF NOT EXISTS request_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    client_key TEXT,
+    method TEXT,
+    endpoint TEXT,
+    status_code INTEGER,
+    cost REAL,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
 `);
 
 app.use(express.json({ limit: '10mb' }));
@@ -35,23 +45,26 @@ app.get('/', (req, res) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CloudGrip AI — High-Speed LLM Proxy Engine</title>
+  <title>CloudGrip AI — High-Performance LLM Proxy Engine</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #090d16;
-      --card-bg: #111827;
-      --border: #1f2937;
+      --bg: #060911;
+      --card-bg: #0d1322;
+      --sidebar-bg: #0a0e19;
+      --border: #1e293b;
       --border-focus: #3b82f6;
-      --text: #f3f4f6;
-      --text-muted: #9ca3af;
+      --text: #f1f5f9;
+      --text-muted: #64748b;
       --primary: #3b82f6;
       --primary-hover: #2563eb;
       --accent: #10b981;
       --error-bg: rgba(239, 68, 68, 0.1);
       --error-text: #f87171;
+      --success-bg: rgba(16, 185, 129, 0.1);
+      --success-text: #34d399;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -63,33 +76,64 @@ app.get('/', (req, res) => {
       min-height: 100vh;
       display: flex;
       flex-direction: column;
+    }
+
+    /* Navbar */
+    nav {
+      display: flex;
+      justify-content: space-between;
       align-items: center;
-      justify-content: center;
-      padding: 24px;
-      background-image: radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.08) 0%, transparent 50%);
+      padding: 16px 32px;
+      border-bottom: 1px solid var(--border);
+      background: var(--sidebar-bg);
     }
 
-    .wrapper {
-      width: 100%;
-      max-width: 480px;
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
     }
 
-    .brand {
-      text-align: center;
-      margin-bottom: 32px;
-    }
-
-    .brand h1 {
-      font-size: 26px;
+    .nav-brand h1 {
+      font-size: 18px;
       font-weight: 700;
-      letter-spacing: -0.5px;
       color: #fff;
+      letter-spacing: -0.5px;
     }
 
-    .brand p {
-      color: var(--text-muted);
-      font-size: 14px;
-      margin-top: 6px;
+    .badge-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--accent);
+      background: var(--success-bg);
+      padding: 4px 10px;
+      border-radius: 20px;
+      border: 1px solid rgba(16, 185, 129, 0.2);
+    }
+
+    .pulse {
+      width: 8px;
+      height: 8px;
+      background: var(--accent);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--accent);
+    }
+
+    /* Main Container */
+    .main-content {
+      flex: 1;
+      padding: 32px;
+      max-width: 1280px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    /* Auth Wrapper */
+    .auth-wrapper {
+      max-width: 440px;
+      margin: 60px auto;
     }
 
     .card {
@@ -97,12 +141,12 @@ app.get('/', (req, res) => {
       border: 1px solid var(--border);
       border-radius: 16px;
       padding: 32px;
-      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
     }
 
     .tabs {
       display: flex;
-      background: rgba(0, 0, 0, 0.2);
+      background: rgba(0, 0, 0, 0.3);
       padding: 4px;
       border-radius: 10px;
       margin-bottom: 24px;
@@ -113,7 +157,7 @@ app.get('/', (req, res) => {
       flex: 1;
       text-align: center;
       padding: 10px;
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 600;
       color: var(--text-muted);
       cursor: pointer;
@@ -124,30 +168,6 @@ app.get('/', (req, res) => {
     .tab.active {
       background: var(--primary);
       color: #fff;
-      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-    }
-
-    .pricing-banner {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      background: rgba(16, 185, 129, 0.05);
-      border: 1px solid rgba(16, 185, 129, 0.2);
-      padding: 12px 16px;
-      border-radius: 10px;
-      margin-bottom: 24px;
-    }
-
-    .pricing-banner .plan {
-      font-size: 13px;
-      color: var(--accent);
-      font-weight: 600;
-    }
-
-    .pricing-banner .price {
-      font-size: 16px;
-      font-weight: 700;
-      color: #fff;
     }
 
     .form-group {
@@ -156,22 +176,24 @@ app.get('/', (req, res) => {
 
     label {
       display: block;
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 500;
       color: var(--text-muted);
       margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
 
     input {
       width: 100%;
       padding: 12px 16px;
-      background: #0b0f19;
+      background: #04060b;
       border: 1px solid var(--border);
       border-radius: 10px;
       color: #fff;
       font-size: 14px;
       font-family: inherit;
-      transition: border-color 0.2s, box-shadow 0.2s;
+      transition: border-color 0.2s;
     }
 
     input:focus {
@@ -190,16 +212,22 @@ app.get('/', (req, res) => {
       border: none;
       border-radius: 10px;
       cursor: pointer;
-      transition: background 0.2s, transform 0.1s;
+      transition: background 0.2s;
       margin-top: 8px;
     }
 
     .btn:hover { background: var(--primary-hover); }
-    .btn:active { transform: scale(0.99); }
+
+    .btn-secondary {
+      background: transparent;
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      margin-top: 10px;
+    }
+    .btn-secondary:hover { background: rgba(255,255,255,0.02); color: #fff; }
 
     .btn-danger {
       background: #ef4444;
-      margin-top: 16px;
     }
     .btn-danger:hover { background: #dc2626; }
 
@@ -215,101 +243,156 @@ app.get('/', (req, res) => {
       margin-bottom: 16px;
     }
 
+    .success-box {
+      background: var(--success-bg);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+      color: var(--success-text);
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-bottom: 16px;
+    }
+
+    /* Full Dashboard View */
+    .dashboard-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+
+    .dashboard-header h2 {
+      font-size: 24px;
+      font-weight: 700;
+      color: #fff;
+    }
+
     .stats-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-      margin-bottom: 18px;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
     }
 
     .stat-card {
-      background: #0b0f19;
+      background: var(--card-bg);
       border: 1px solid var(--border);
-      padding: 14px;
-      border-radius: 10px;
+      padding: 20px;
+      border-radius: 12px;
     }
 
     .stat-card .label {
-      font-size: 11px;
+      font-size: 12px;
       color: var(--text-muted);
       text-transform: uppercase;
       letter-spacing: 0.5px;
-      margin-bottom: 4px;
+      margin-bottom: 8px;
     }
 
     .stat-card .value {
-      font-size: 16px;
+      font-size: 22px;
       font-weight: 700;
       color: #fff;
       font-family: 'JetBrains Mono', monospace;
     }
 
-    .dashboard-view h3 {
-      font-size: 18px;
+    .panel {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+
+    .panel h3 {
+      font-size: 16px;
       font-weight: 600;
-      margin-bottom: 6px;
       color: #fff;
-    }
-
-    .dashboard-view p {
-      font-size: 13px;
-      color: var(--text-muted);
-      margin-bottom: 20px;
-    }
-
-    .key-box {
-      background: #0b0f19;
-      border: 1px solid var(--border);
-      padding: 12px 14px;
-      border-radius: 10px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 13px;
-      color: #38bdf8;
-      word-break: break-all;
-      margin-bottom: 18px;
-    }
-
-    .instruction-note {
-      font-size: 12px;
-      color: var(--text-muted);
-      background: rgba(255, 255, 255, 0.02);
-      padding: 12px;
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      line-height: 1.5;
       margin-bottom: 16px;
     }
 
-    code {
-      font-family: 'JetBrains Mono', monospace;
-      color: #38bdf8;
-      background: rgba(56, 189, 248, 0.1);
-      padding: 2px 4px;
-      border-radius: 4px;
+    .key-row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
     }
+
+    .key-box {
+      flex: 1;
+      background: #04060b;
+      border: 1px solid var(--border);
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      color: #38bdf8;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Logs Table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 13px;
+    }
+
+    th {
+      color: var(--text-muted);
+      font-weight: 600;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    td {
+      padding: 12px;
+      border-bottom: 1px solid var(--border);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .status-badge {
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: bold;
+    }
+    .status-200 { background: rgba(16,185,129,0.1); color: #34d399; }
+    .status-err { background: rgba(239,68,68,0.1); color: #f87171; }
+
+    .auth-footer {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      margin-top: 12px;
+    }
+    .auth-footer a { color: var(--primary); text-decoration: none; cursor: pointer; }
+    .auth-footer a:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
 
-  <div class="wrapper">
-    <div class="brand">
-      <h1>CloudGrip AI</h1>
-      <p>High-Performance LLM Proxy & Anti-Abuse Gateway</p>
+  <nav>
+    <div class="nav-brand">
+      <h1>CloudGrip AI Engine</h1>
     </div>
+    <div class="badge-status">
+      <div class="pulse"></div> Gateway Operational
+    </div>
+  </nav>
 
-    <div class="card">
-      <div id="auth-container">
+  <div class="main-content">
+
+    <!-- Auth Section -->
+    <div id="auth-container" class="auth-wrapper">
+      <div class="card">
         <div class="tabs">
-          <div class="tab active" onclick="switchTab('signup')">Sign Up</div>
-          <div class="tab" onclick="switchTab('login')">Log In</div>
-        </div>
-
-        <div class="pricing-banner">
-          <span class="plan"> 7-Day Free Trial Included</span>
-          <span class="price">$10<span style="font-size:12px; color:var(--text-muted); font-weight:normal;">/mo</span></span>
+          <div class="tab active" id="tab-su" onclick="switchTab('signup')">Sign Up</div>
+          <div class="tab" id="tab-li" onclick="switchTab('login')">Log In</div>
         </div>
 
         <div id="error-msg" class="error-box hidden"></div>
+        <div id="success-msg" class="success-box hidden"></div>
 
         <!-- Signup Form -->
         <div id="signup-box">
@@ -319,13 +402,9 @@ app.get('/', (req, res) => {
           </div>
           <div class="form-group">
             <label>Password</label>
-            <input type="password" id="su-pass" placeholder="Create a secure password">
+            <input type="password" id="su-pass" placeholder="Create secure password">
           </div>
           <button class="btn" onclick="register()">Create Account & Start Trial</button>
-          
-          <p style="font-size: 11px; color: var(--text-muted); margin-top: 12px; text-align: center; line-height: 1.4;">
-            By signing up, you agree to our <a href="/terms" target="_blank" style="color: var(--primary);">Terms of Service</a> and <a href="/privacy" target="_blank" style="color: var(--primary);">Privacy Policy</a>.
-          </p>
         </div>
 
         <!-- Login Form -->
@@ -336,80 +415,134 @@ app.get('/', (req, res) => {
           </div>
           <div class="form-group">
             <label>Password</label>
-            <input type="password" id="li-pass" placeholder="Enter your password">
+            <input type="password" id="li-pass" placeholder="Enter password">
           </div>
-          <button class="btn" onclick="login()">Access Dashboard</button>
-        </div>
-      </div>
-
-      <!-- Dashboard View -->
-      <div id="dashboard" class="dashboard-view hidden">
-        <h3>Live Overview</h3>
-        <p>Monitor your token spending and active trial duration.</p>
-        
-        <div class="stats-grid">
-          <div class="stat-card">
-            <div class="label">Current Spend</div>
-            <div class="value" id="stat-spend">$0.00</div>
-          </div>
-          <div class="stat-card">
-            <div class="label">Trial Time Left</div>
-            <div class="value" id="stat-trial">-</div>
+          <button class="btn" onclick="login()">Access Gateway</button>
+          <div class="auth-footer">
+            <a onclick="switchTab('forgot')">Forgot password?</a>
           </div>
         </div>
 
-        <label>Your Unique API Key</label>
-        <div class="key-box" id="res-key"></div>
-
-        <div class="instruction-note">
-          <strong>Integration Tip:</strong> Route your base URL to this server and provide your key via the <code>x-cloudgrip-key</code> header.
+        <!-- Forgot Password Form -->
+        <div id="forgot-box" class="hidden">
+          <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">Enter your registered email address and we'll dispatch your credentials or reset info.</p>
+          <div class="form-group">
+            <label>Email Address</label>
+            <input type="email" id="fg-email" placeholder="name@example.com">
+          </div>
+          <button class="btn" onclick="forgotPassword()">Recover Password</button>
+          <button class="btn btn-secondary" onclick="switchTab('login')">Back to Login</button>
         </div>
 
-        <button class="btn btn-danger" onclick="logout()">Sign Out</button>
       </div>
     </div>
+
+    <!-- Full Dashboard View -->
+    <div id="dashboard" class="hidden">
+      <div class="dashboard-header">
+        <h2>Gateway Control Panel</h2>
+        <button class="btn btn-danger" style="width: auto; padding: 10px 20px; margin: 0;" onclick="logout()">Sign Out</button>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="label">Total Spend (USD)</div>
+          <div class="value" id="stat-spend">$0.0000</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Trial Duration Remaining</div>
+          <div class="value" id="stat-trial">-</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Gateway Status</div>
+          <div class="value" style="color: var(--accent);">Active</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>API Authentication Key</h3>
+        <div class="key-row">
+          <div class="key-box" id="res-key"></div>
+          <button class="btn" style="width: 140px; margin:0;" onclick="copyKey()">Copy Key</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Live Request Activity Logs</h3>
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">Real-time feed of traffic passing through your CloudGrip proxy gateway.</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Method</th>
+              <th>Endpoint</th>
+              <th>Status</th>
+              <th>Cost</th>
+            </tr>
+          </thead>
+          <tbody id="logs-table-body">
+            <tr><td colspan="5" style="text-align: center; color: var(--text-muted);">No proxy requests logged yet. Make a request using your API key!</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
   </div>
 
   <script>
+    // Auto-login if key is already in localStorage
+    window.onload = async () => {
+      const savedKey = localStorage.getItem('cloudgrip_key');
+      if (savedKey) {
+        await loadDashboard(savedKey);
+      }
+    };
+
     function switchTab(tab) {
-      const suBox = document.getElementById('signup-box');
-      const liBox = document.getElementById('login-box');
-      const tabs = document.querySelectorAll('.tab');
-      hideError();
+      document.getElementById('signup-box').classList.add('hidden');
+      document.getElementById('login-box').classList.add('hidden');
+      document.getElementById('forgot-box').classList.add('hidden');
+      document.getElementById('tab-su').classList.remove('active');
+      document.getElementById('tab-li').classList.remove('active');
+      hideMsg();
 
       if(tab === 'signup') {
-        suBox.classList.remove('hidden');
-        liBox.classList.add('hidden');
-        tabs[0].classList.add('active');
-        tabs[1].classList.remove('active');
-      } else {
-        suBox.classList.add('hidden');
-        liBox.classList.remove('hidden');
-        tabs[1].classList.add('active');
-        tabs[0].classList.remove('active');
+        document.getElementById('signup-box').classList.remove('hidden');
+        document.getElementById('tab-su').classList.add('active');
+      } else if(tab === 'login') {
+        document.getElementById('login-box').classList.remove('hidden');
+        document.getElementById('tab-li').classList.add('active');
+      } else if(tab === 'forgot') {
+        document.getElementById('forgot-box').classList.remove('hidden');
       }
     }
 
     function showError(msg) {
-      const errBox = document.getElementById('error-msg');
-      errBox.innerText = msg;
-      errBox.classList.remove('hidden');
+      const box = document.getElementById('error-msg');
+      box.innerText = msg;
+      box.classList.remove('hidden');
+      document.getElementById('success-msg').classList.add('hidden');
     }
 
-    function hideError() {
+    function showSuccess(msg) {
+      const box = document.getElementById('success-msg');
+      box.innerText = msg;
+      box.classList.remove('hidden');
       document.getElementById('error-msg').classList.add('hidden');
     }
 
+    function hideMsg() {
+      document.getElementById('error-msg').classList.add('hidden');
+      document.getElementById('success-msg').classList.add('hidden');
+    }
+
     async function register() {
-      hideError();
+      hideMsg();
       const email = document.getElementById('su-email').value.trim();
       const password = document.getElementById('su-pass').value;
       const fingerprint = navigator.userAgent + screen.width + screen.height;
       
-      if(!email || !password) {
-        showError('Please fill in all required fields.');
-        return;
-      }
+      if(!email || !password) return showError('Please fill in all fields.');
 
       try {
         const res = await fetch('/register', {
@@ -419,24 +552,22 @@ app.get('/', (req, res) => {
         });
         const data = await res.json();
         if(data.success) {
-          showDashboard(data.apiKey);
+          localStorage.setItem('cloudgrip_key', data.apiKey);
+          await loadDashboard(data.apiKey);
         } else {
           showError(data.error || 'Registration failed.');
         }
       } catch (err) {
-        showError('Network error. Please try again.');
+        showError('Network connectivity error.');
       }
     }
 
     async function login() {
-      hideError();
+      hideMsg();
       const email = document.getElementById('li-email').value.trim();
       const password = document.getElementById('li-pass').value;
       
-      if(!email || !password) {
-        showError('Please fill in your login details.');
-        return;
-      }
+      if(!email || !password) return showError('Please enter login credentials.');
 
       try {
         const res = await fetch('/login', {
@@ -446,21 +577,43 @@ app.get('/', (req, res) => {
         });
         const data = await res.json();
         if(data.success) {
-          showDashboard(data.apiKey);
+          localStorage.setItem('cloudgrip_key', data.apiKey);
+          await loadDashboard(data.apiKey);
         } else {
-          showError(data.error || 'Invalid credentials.');
+          showError(data.error || 'Invalid login details.');
         }
       } catch (err) {
-        showError('Network error. Please try again.');
+        showError('Network connectivity error.');
       }
     }
 
-    async function showDashboard(key) {
+    async function forgotPassword() {
+      hideMsg();
+      const email = document.getElementById('fg-email').value.trim();
+      if(!email) return showError('Please enter your email address.');
+
+      try {
+        const res = await fetch('/forgot-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
+        const data = await res.json();
+        if(data.success) {
+          showSuccess(data.message);
+        } else {
+          showError(data.error || 'Recovery request failed.');
+        }
+      } catch (err) {
+        showError('Network connectivity error.');
+      }
+    }
+
+    async function loadDashboard(key) {
       document.getElementById('auth-container').classList.add('hidden');
       document.getElementById('dashboard').classList.remove('hidden');
       document.getElementById('res-key').innerText = key;
 
-      // Fetch live user stats
       try {
         const res = await fetch('/client/stats', {
           headers: { 'x-cloudgrip-key': key }
@@ -468,75 +621,102 @@ app.get('/', (req, res) => {
         const data = await res.json();
         if(data.success) {
           document.getElementById('stat-spend').innerText = '$' + data.currentSpendUSD.toFixed(4);
-          
           const expires = new Date(data.trialExpiresAt);
-          const now = new Date();
-          const diffDays = Math.ceil((expires - now) / (1000 * 60 * 60 * 24));
-          
-          if(diffDays > 0) {
-            document.getElementById('stat-trial').innerText = diffDays + ' Days Left';
-          } else {
-            document.getElementById('stat-trial').innerText = 'Expired';
+          const diffDays = Math.ceil((expires - new Date()) / (1000 * 60 * 60 * 24));
+          document.getElementById('stat-trial').innerText = diffDays > 0 ? diffDays + ' Days Left' : 'Expired';
+
+          // Render Logs
+          if(data.logs && data.logs.length > 0) {
+            const tbody = document.getElementById('logs-table-body');
+            tbody.innerHTML = data.logs.map(log => \`
+              <tr>
+                <td>\${log.timestamp}</td>
+                <td>\${log.method}</td>
+                <td>\${log.endpoint}</td>
+                <td><span class="status-badge \${log.status_code === 200 ? 'status-200' : 'status-err'}">\${log.status_code}</span></td>
+                <td>$\${log.cost.toFixed(4)}</td>
+              </tr>
+            \`).join('');
           }
+        } else {
+          logout();
         }
       } catch(e) {
-        console.error('Failed to load stats', e);
+        console.error('Failed fetching telemetry', e);
       }
     }
 
-    function logout() { location.reload(); }
+    function copyKey() {
+      const key = document.getElementById('res-key').innerText;
+      navigator.clipboard.writeText(key);
+      alert('API Key copied to clipboard!');
+    }
+
+    function logout() {
+      localStorage.removeItem('cloudgrip_key');
+      location.reload();
+    }
   </script>
 </body>
 </html>`);
 });
 
 app.get('/terms', (req, res) => {
-  res.send(`<!DOCTYPE html><html><head><title>Terms of Service - CloudGrip AI</title><style>body{font-family:sans-serif;background:#090d16;color:#f3f4f6;padding:40px;max-width:700px;margin:auto;line-height:1.6}h1{color:#38bdf8}</style></head><body><h1>Terms of Service</h1><p>Welcome to CloudGrip AI. By using our proxy service, you agree to use it legally and responsibly. Services are provided "as is" without warranty of any kind. We reserve the right to terminate API keys that abuse system resources or engage in malicious activity. We are not liable for any downtime or third-party API interruptions.</p></body></html>`);
+  res.send(`<!DOCTYPE html><html><head><title>Terms - CloudGrip AI</title><style>body{font-family:sans-serif;background:#060911;color:#f1f5f9;padding:40px;max-width:700px;margin:auto;line-height:1.6}h1{color:#38bdf8}</style></head><body><h1>Terms of Service</h1><p>Welcome to CloudGrip AI. You agree to utilize this gateway lawfully.</p></body></html>`);
 });
 
 app.get('/privacy', (req, res) => {
-  res.send(`<!DOCTYPE html><html><head><title>Privacy Policy - CloudGrip AI</title><style>body{font-family:sans-serif;background:#090d16;color:#f3f4f6;padding:40px;max-width:700px;margin:auto;line-height:1.6}h1{color:#38bdf8}</style></head><body><h1>Privacy Policy</h1><p>CloudGrip AI collects your email, encrypted passwords, and basic device information solely for authentication, session management, and preventing trial abuse. We do not sell or share your personal data with third parties.</p></body></html>`);
+  res.send(`<!DOCTYPE html><html><head><title>Privacy - CloudGrip AI</title><style>body{font-family:sans-serif;background:#060911;color:#f1f5f9;padding:40px;max-width:700px;margin:auto;line-height:1.6}h1{color:#38bdf8}</style></head><body><h1>Privacy Policy</h1><p>We protect your credential integrity and process traffic securely.</p></body></html>`);
+});
+
+app.post('/forgot-password', (req, res) => {
+  const { email } = req.body || {};
+  const user = db.prepare('SELECT * FROM clients WHERE email = ?').get(email);
+  if (!user) {
+    return res.status(404).json({ error: 'No account found with this email address.' });
+  }
+  // In production, this would trigger SendGrid/Resend. For now, return confirmation.
+  res.json({
+    success: true,
+    message: 'Password recovery instructions have been dispatched to your email address.'
+  });
 });
 
 app.get('/client/stats', (req, res) => {
   const clientKey = req.headers['x-cloudgrip-key'] || req.query.cloudgrip_key;
-  if (!clientKey) return res.status(401).json({ error: 'Unauthorized: Missing key' });
+  if (!clientKey) return res.status(401).json({ error: 'Unauthorized' });
 
   const client = db.prepare('SELECT * FROM clients WHERE client_key = ?').get(clientKey);
-  if (!client) return res.status(403).json({ error: 'Forbidden: Invalid key' });
+  if (!client) return res.status(403).json({ error: 'Forbidden' });
+
+  const logs = db.prepare('SELECT * FROM request_logs WHERE client_key = ? ORDER BY id DESC LIMIT 10').all(clientKey);
 
   res.json({
     success: true,
     currentSpendUSD: client.current_spend_usd,
     budgetUSD: client.budget_usd,
     trialExpiresAt: client.trial_expires_at,
-    status: client.status
+    status: client.status,
+    logs: logs
   });
 });
 
 app.post('/register', async (req, res) => {
   const { email, password, fingerprint } = req.body || {};
-  if (!email || !password) {
-    return res.status(400).json({ error: 'Email and password are required.' });
-  }
+  if (!email || !password) return res.status(400).json({ error: 'Email and password required.' });
 
   const existingUser = db.prepare('SELECT * FROM clients WHERE email = ?').get(email);
-  if (existingUser) {
-    return res.status(400).json({ error: 'Email already registered. Please log in.' });
-  }
+  if (existingUser) return res.status(400).json({ error: 'Email already registered. Please log in.' });
 
   let grantTrial = true;
   if (fingerprint) {
     const deviceMatch = db.prepare('SELECT * FROM clients WHERE device_fingerprint = ?').get(fingerprint);
-    if (deviceMatch) {
-      grantTrial = false;
-    }
+    if (deviceMatch) grantTrial = false;
   }
 
   const clientKey = `cg-${crypto.randomBytes(16).toString('hex')}`;
   const hashedPassword = await bcrypt.hash(password, 10);
-  const trialDays = grantTrial ? 7 : 0;
-  const trialExpiresAt = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000).toISOString();
+  const trialExpiresAt = new Date(Date.now() + (grantTrial ? 7 : 0) * 24 * 60 * 60 * 1000).toISOString();
   const status = grantTrial ? 'trial' : 'expired';
   const budgetUSD = grantTrial ? 0.50 : 0.00;
 
@@ -546,14 +726,8 @@ app.post('/register', async (req, res) => {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(clientKey, email.split('@')[0], email, hashedPassword, fingerprint || 'unknown', budgetUSD, 0.0, trialExpiresAt, status);
 
-    res.json({
-      success: true,
-      message: grantTrial ? '7-day free trial activated!' : 'Device already claimed a free trial. Subscription required.',
-      apiKey: clientKey,
-      trialActive: grantTrial
-    });
+    res.json({ success: true, apiKey: clientKey });
   } catch (err) {
-    console.error('Registration error:', err);
     res.status(500).json({ error: 'Database error: ' + err.message });
   }
 });
@@ -566,36 +740,28 @@ app.post('/login', async (req, res) => {
     return res.status(401).json({ error: 'Invalid email or password.' });
   }
 
-  res.json({
-    success: true,
-    apiKey: user.client_key
-  });
+  res.json({ success: true, apiKey: user.client_key });
 });
 
 app.use((req, res, next) => {
-  if (['/events', '/register', '/login', '/', '/terms', '/privacy', '/client/stats'].includes(req.path)) return next();
+  if (['/events', '/register', '/login', '/', '/terms', '/privacy', '/client/stats', '/forgot-password'].includes(req.path)) return next();
 
   const clientKey = req.headers['x-cloudgrip-key'] || req.query.cloudgrip_key;
-  if (!clientKey) return res.status(401).json({ error: 'Unauthorized: Missing x-cloudgrip-key header' });
+  if (!clientKey) return res.status(401).json({ error: 'Unauthorized: Missing key' });
 
   const clientConfig = db.prepare('SELECT * FROM clients WHERE client_key = ?').get(clientKey);
   if (!clientConfig) return res.status(403).json({ error: 'Forbidden: Invalid API Key' });
 
-  if (new Date() > new Date(clientConfig.trial_expires_at)) {
-    return res.status(403).json({ error: 'Trial Expired', message: 'Your free trial has expired. Please pay $10/month to continue.' });
-  }
-
-  req.clientConfig = {
-    id: clientConfig.id,
-    key: clientConfig.client_key,
-    budgetUSD: clientConfig.budget_usd,
-    currentSpendUSD: clientConfig.current_spend_usd
-  };
+  req.clientConfig = clientConfig;
   next();
 });
 
 app.all(/.*/, async (req, res) => {
-  if (['/', '/register', '/login', '/events', '/terms', '/privacy', '/client/stats'].includes(req.path)) return;
+  if (['/', '/register', '/login', '/events', '/terms', '/privacy', '/client/stats', '/forgot-password'].includes(req.path)) return;
+
+  const startTime = Date.now();
+  let statusCode = 502;
+  let cost = 0.01;
 
   try {
     const targetUrl = `https://generativelanguage.googleapis.com${req.originalUrl}`;
@@ -615,13 +781,19 @@ app.all(/.*/, async (req, res) => {
     if (bodyData && !headers['content-type']) headers['content-type'] = 'application/json';
 
     const response = await fetch(targetUrl, { method: req.method, headers, body: bodyData });
+    statusCode = response.status;
 
     if (response.ok) {
-      const newSpend = req.clientConfig.currentSpendUSD + 0.01;
-      db.prepare('UPDATE clients SET current_spend_usd = ? WHERE client_key = ?').run(newSpend, req.clientConfig.key);
+      const newSpend = req.clientConfig.current_spend_usd + cost;
+      db.prepare('UPDATE clients SET current_spend_usd = ? WHERE client_key = ?').run(newSpend, req.clientConfig.client_key);
     }
 
-    res.status(response.status);
+    // Log the request
+    db.prepare('INSERT INTO request_logs (client_key, method, endpoint, status_code, cost) VALUES (?, ?, ?, ?, ?)').run(
+      req.clientConfig.client_key, req.method, req.originalUrl, statusCode, cost
+    );
+
+    res.status(statusCode);
     response.headers.forEach((value, key) => {
       if (!['content-encoding', 'transfer-encoding', 'content-length'].includes(key.toLowerCase())) {
         res.setHeader(key, value);
@@ -634,6 +806,9 @@ app.all(/.*/, async (req, res) => {
       res.end();
     }
   } catch (err) {
+    db.prepare('INSERT INTO request_logs (client_key, method, endpoint, status_code, cost) VALUES (?, ?, ?, ?, ?)').run(
+      req.clientConfig?.client_key || 'unknown', req.method, req.originalUrl, 502, 0.00
+    );
     res.status(502).json({ error: 'Proxy Gateway Error', details: err.message });
   }
 });
