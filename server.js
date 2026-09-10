@@ -10,7 +10,6 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const telemetryEmitter = new EventEmitter();
 
-// --- Initialize SQLite Database ---
 const db = new Database('cloudgrip.db');
 
 db.exec(`
@@ -27,11 +26,9 @@ db.exec(`
   )
 `);
 
-// --- Express Middleware Setup ---
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// --- Built-in Frontend UI (Landing, Login, & Dashboard) ---
 app.get('/', (req, res) => {
   res.send(`<!DOCTYPE html>
 <html lang="en">
@@ -104,7 +101,7 @@ app.get('/', (req, res) => {
     async function register() {
       const email = document.getElementById('su-email').value;
       const password = document.getElementById('su-pass').value;
-      const fingerprint = navigator.userAgent + screen.width + screen.height; // Device anti-abuse tracker
+      const fingerprint = navigator.userAgent + screen.width + screen.height;
       
       const res = await fetch('/register', {
         method: 'POST',
@@ -151,34 +148,31 @@ app.get('/', (req, res) => {
 </html>`);
 });
 
-// --- Registration Endpoint with Device Anti-Abuse Check ---
 app.post('/register', async (req, res) => {
   const { email, password, fingerprint } = req.body || {};
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password are required.' });
   }
 
-  // Check if email already exists
   const existingUser = db.prepare('SELECT * FROM clients WHERE email = ?').get(email);
   if (existingUser) {
     return res.status(400).json({ error: 'Email already registered. Please log in.' });
   }
 
-  // Check device fingerprint to prevent same device creating multi free trials
   let grantTrial = true;
   if (fingerprint) {
     const deviceMatch = db.prepare('SELECT * FROM clients WHERE device_fingerprint = ?').get(fingerprint);
     if (deviceMatch) {
-      grantTrial = false; // Deny free trial, force paid subscription mode
+      grantTrial = false;
     }
   }
 
   const clientKey = `cg-${crypto.randomBytes(16).toString('hex')}`;
   const hashedPassword = await bcrypt.hash(password, 10);
-  const trialDays = grantTrial ? 7 : 0; // 0 days trial if device already used
+  const trialDays = grantTrial ? 7 : 0;
   const trialExpiresAt = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000).toISOString();
   const status = grantTrial ? 'trial' : 'expired';
-  const budgetUSD = grantTrial ? 0.50 : 0.00; // No free budget if trial is denied
+  const budgetUSD = grantTrial ? 0.50 : 0.00;
 
   try {
     db.prepare(`
@@ -197,7 +191,6 @@ app.post('/register', async (req, res) => {
   }
 });
 
-// --- Login Endpoint ---
 app.post('/login', async (req, res) => {
   const { email, password } = req.body || {};
   const user = db.prepare('SELECT * FROM clients WHERE email = ?').get(email);
@@ -212,7 +205,6 @@ app.post('/login', async (req, res) => {
   });
 });
 
-// --- Authentication & Proxy Middleware ---
 app.use((req, res, next) => {
   if (req.path === '/events' || req.path === '/register' || req.path === '/login' || req.path === '/') return next();
 
@@ -235,9 +227,8 @@ app.use((req, res, next) => {
   next();
 });
 
-// --- Transparent Proxy Handler ---
 app.all(/.*/, async (req, res) => {
-  if (req.path === '/events' || req.path === '/register' || req.path === '/login' || req.path === '/') return;
+  if (['/', '/register', '/login', '/events'].includes(req.path)) return;
 
   try {
     const targetUrl = `https://generativelanguage.googleapis.com${req.originalUrl}`;
@@ -281,5 +272,5 @@ app.all(/.*/, async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`[CloudGrip Engine] Live on port ${PORT} with UI & anti-abuse protection.`);
+  console.log(`[CloudGrip Engine] Live on port ${PORT}`);
 });
