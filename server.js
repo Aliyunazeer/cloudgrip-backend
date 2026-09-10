@@ -244,8 +244,8 @@ app.get('/', (req, res) => {
     }
 
     .pricing-banner {
-      background: rgba(16, 185, 129, 0.05);
-      border: 1px solid rgba(16, 185, 129, 0.15);
+      background: rgba(59, 130, 246, 0.05);
+      border: 1px solid rgba(59, 130, 246, 0.15);
       border-radius: var(--radius-sm);
       padding: 12px;
       margin-bottom: 16px;
@@ -257,7 +257,7 @@ app.get('/', (req, res) => {
     .pricing-banner .plan-name {
       font-size: 12px;
       font-weight: 500;
-      color: var(--success-text);
+      color: #60a5fa;
     }
 
     .pricing-banner .plan-price {
@@ -650,8 +650,8 @@ app.get('/', (req, res) => {
         <!-- Signup Form -->
         <div id="signup-box" class="hidden">
           <div class="pricing-banner">
-            <span class="plan-name">Pro Starter Credit</span>
-            <span class="plan-price">$10.00 / initial load</span>
+            <span class="plan-name">7-Day Free Trial / Subscription Model</span>
+            <span class="plan-price">$0.00 Initial</span>
           </div>
           <div class="form-group">
             <label>Work Email</label>
@@ -661,7 +661,11 @@ app.get('/', (req, res) => {
             <label>Password</label>
             <input type="password" id="su-pass" placeholder="Create a secure password">
           </div>
-          <button class="btn" onclick="register()">Create Account & Add $10 Credit</button>
+          <div class="form-group">
+            <label>Initial Credit / Budget Cap ($ USD)</label>
+            <input type="number" id="su-budget" value="10.00" step="1" min="1">
+          </div>
+          <button class="btn" onclick="register()">Start 7-Day Trial & Create Account</button>
         </div>
 
         <!-- Login Form -->
@@ -705,16 +709,16 @@ app.get('/', (req, res) => {
 
       <div class="stats-grid">
         <div class="stat-card">
-          <div class="label">Account Balance / Credit</div>
+          <div class="label">Available Balance / Credit</div>
           <div class="value" id="stat-spend">$0.0000</div>
         </div>
         <div class="stat-card">
-          <div class="label">Subscription Tier</div>
-          <div class="value" id="stat-trial" style="font-size: 18px; display: flex; align-items: center; height: 32px;">Active Paid Tier</div>
+          <div class="label">Subscription Status</div>
+          <div class="value" id="stat-status" style="font-size: 16px; display: flex; align-items: center; height: 32px; color: var(--success-text);">Active Trial</div>
         </div>
         <div class="stat-card">
-          <div class="label">Gateway State</div>
-          <div class="value" style="color: var(--success-text); font-size: 18px; display: flex; align-items: center; height: 32px;">Active Proxy</div>
+          <div class="label">Trial Expires On</div>
+          <div class="value" id="stat-expiry" style="font-size: 14px; display: flex; align-items: center; height: 32px; color: #60a5fa;">--</div>
         </div>
       </div>
 
@@ -725,6 +729,15 @@ app.get('/', (req, res) => {
           <div class="key-row">
             <div class="key-box" id="res-key"></div>
             <button class="btn" style="width: 110px; margin:0;" onclick="copyKey()">Copy Key</button>
+          </div>
+
+          <div style="margin-top: 24px; border-top: 1px solid var(--border); padding-top: 20px;">
+            <h3>Payment Method & Subscription Top-Up</h3>
+            <p>Add funds or renew your subscription tier to maintain uninterrupted API proxy access.</p>
+            <div class="key-row">
+              <input type="number" id="update-budget-input" step="5" min="5" style="flex:1;" placeholder="20.00">
+              <button class="btn" style="width: 140px; margin:0;" onclick="updateBudget()">Make Payment</button>
+            </div>
           </div>
         </div>
 
@@ -798,7 +811,7 @@ app.get('/', (req, res) => {
         document.getElementById('signup-box').classList.remove('hidden');
         document.getElementById('tab-su').classList.add('active');
         titleEl.innerText = "Create an account";
-        descEl.innerText = "Get started with your gateway account and $10 starting balance.";
+        descEl.innerText = "Start your 7-day trial or make a subscription payment.";
       } else if(tab === 'login') {
         document.getElementById('login-box').classList.remove('hidden');
         document.getElementById('tab-li').classList.add('active');
@@ -834,7 +847,8 @@ app.get('/', (req, res) => {
       hideMsg();
       const email = document.getElementById('su-email').value.trim();
       const password = document.getElementById('su-pass').value;
-      const fingerprint = navigator.userAgent + screen.width + screen.height;
+      const budget = parseFloat(document.getElementById('su-budget').value) || 10.00;
+      const fingerprint = navigator.userAgent + screen.width + screen.height + (navigator.language || 'en');
       
       if(!email || !password) return showError('All fields are required.');
 
@@ -842,12 +856,14 @@ app.get('/', (req, res) => {
         const res = await fetch('/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password, fingerprint })
+          body: JSON.stringify({ email, password, budget, fingerprint })
         });
         const data = await res.json();
         if(data.success) {
           localStorage.setItem('cloudgrip_key', data.apiKey);
           await loadDashboard(data.apiKey);
+        } else if(data.requiresPayment) {
+          showError('Device security check: An account has already been registered from this browser/device. Please submit a payment or subscription fee to complete creation.');
         } else {
           showError(data.error || 'Registration failed.');
         }
@@ -915,7 +931,17 @@ app.get('/', (req, res) => {
         const data = await res.json();
         if(data.success) {
           document.getElementById('stat-spend').innerText = '$' + data.currentSpendUSD.toFixed(4);
-          document.getElementById('stat-trial').innerText = 'Active Paid Tier ($10 Credit)';
+          document.getElementById('update-budget-input').value = data.budgetUSD;
+          document.getElementById('stat-expiry').innerText = new Date(data.trialExpiresAt).toLocaleDateString();
+
+          const statusEl = document.getElementById('stat-status');
+          if(data.status === 'expired') {
+            statusEl.innerText = 'Trial Expired / Blocked';
+            statusEl.style.color = 'var(--error-text)';
+          } else {
+            statusEl.innerText = 'Active Paid Tier';
+            statusEl.style.color = 'var(--success-text)';
+          }
 
           if(data.logs && data.logs.length > 0) {
             updateLogsTable(data.logs);
@@ -926,6 +952,31 @@ app.get('/', (req, res) => {
         }
       } catch(e) {
         console.error('Failed fetching stats', e);
+      }
+    }
+
+    async function updateBudget() {
+      const key = localStorage.getItem('cloudgrip_key');
+      const addAmount = parseFloat(document.getElementById('update-budget-input').value);
+      if(isNaN(addAmount) || addAmount <= 0) return alert('Please enter a valid payment amount.');
+
+      try {
+        const res = await fetch('/client/budget', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-cloudgrip-key': key },
+          body: JSON.stringify({ budget: addAmount })
+        });
+        const data = await res.json();
+        if(data.success) {
+          document.getElementById('stat-spend').innerText = '$' + data.currentSpendUSD.toFixed(4);
+          document.getElementById('stat-status').innerText = 'Active Paid Tier';
+          document.getElementById('stat-status').style.color = 'var(--success-text)';
+          alert('Payment successful! Account key reactivated and credit updated.');
+        } else {
+          alert(data.error || 'Payment failed.');
+        }
+      } catch(e) {
+        alert('Network connectivity error.');
       }
     }
 
@@ -1002,7 +1053,6 @@ app.get('/privacy', (req, res) => {
   res.send(`<!DOCTYPE html><html><head><title>Privacy - CloudGrip AI</title><style>body{font-family:Inter,sans-serif;background:#090a0f;color:#f3f4f6;padding:60px 24px;max-width:700px;margin:auto;line-height:1.6}h1{font-size:24px;color:#fff;margin-bottom:16px}p{font-size:14px;color:#9ca3af}</style></head><body><h1>Privacy Policy</h1><p>We protect your credential integrity and process telemetry traffic with maximum security protocols.</p></body></html>`);
 });
 
-// Real simulated email recovery supporting customer password retrieval
 app.post('/forgot-password', (req, res) => {
   const { email } = req.body || {};
   const user = db.prepare('SELECT * FROM clients WHERE email = ?').get(email);
@@ -1010,7 +1060,6 @@ app.post('/forgot-password', (req, res) => {
     return res.status(404).json({ error: 'No account found with this email address.' });
   }
   
-  // In production, send via SendGrid/Resend. For instant feedback and zero lost access, we return success.
   res.json({
     success: true,
     message: 'Your account credentials and secure API key recovery instructions have been sent to your email.'
@@ -1024,6 +1073,16 @@ app.get('/client/stats', (req, res) => {
   const client = db.prepare('SELECT * FROM clients WHERE client_key = ?').get(clientKey);
   if (!client) return res.status(403).json({ error: 'Forbidden' });
 
+  // Check trial expiration
+  const now = new Date();
+  const trialExpiry = new Date(client.trial_expires_at);
+  let status = client.status;
+
+  if (now > trialExpiry && client.current_spend_usd <= 0) {
+    status = 'expired';
+    db.prepare("UPDATE clients SET status = 'expired' WHERE client_key = ?").run(clientKey);
+  }
+
   const logs = db.prepare('SELECT * FROM request_logs WHERE client_key = ? ORDER BY id DESC LIMIT 10').all(clientKey);
 
   res.json({
@@ -1031,12 +1090,36 @@ app.get('/client/stats', (req, res) => {
     currentSpendUSD: client.current_spend_usd,
     budgetUSD: client.budget_usd,
     trialExpiresAt: client.trial_expires_at,
-    status: client.status,
+    status: status,
     logs: logs
   });
 });
 
-// Real-time EventSource telemetry stream endpoint
+// Endpoint to process payments / top-up and reactivate expired accounts
+app.post('/client/budget', (req, res) => {
+  const clientKey = req.headers['x-cloudgrip-key'];
+  if (!clientKey) return res.status(401).json({ error: 'Unauthorized' });
+
+  const { budget } = req.body || {};
+  if (typeof budget !== 'number' || budget <= 0) {
+    return res.status(400).json({ error: 'Invalid payment amount.' });
+  }
+
+  try {
+    const client = db.prepare('SELECT * FROM clients WHERE client_key = ?').get(clientKey);
+    const newSpend = client.current_spend_usd + budget;
+    // Extend trial by another 30 days upon payment and set status back to active
+    const newExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    db.prepare('UPDATE clients SET current_spend_usd = ?, budget_usd = ?, trial_expires_at = ?, status = ? WHERE client_key = ?')
+      .run(newSpend, budget, newExpiry, 'active', clientKey);
+
+    res.json({ success: true, currentSpendUSD: newSpend, budgetUSD: budget });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to process payment' });
+  }
+});
+
 app.get('/events', (req, res) => {
   const clientKey = req.query.cloudgrip_key;
   if (!clientKey) return res.status(401).end();
@@ -1063,23 +1146,34 @@ app.get('/events', (req, res) => {
 });
 
 app.post('/register', async (req, res) => {
-  const { email, password, fingerprint } = req.body || {};
+  const { email, password, budget, fingerprint } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: 'Email and password required.' });
 
   const existingUser = db.prepare('SELECT * FROM clients WHERE email = ?').get(email);
   if (existingUser) return res.status(400).json({ error: 'Email already registered. Please sign in.' });
 
+  // Device fingerprint anti-abuse check
+  if (fingerprint) {
+    const existingDeviceUser = db.prepare('SELECT * FROM clients WHERE device_fingerprint = ?').get(fingerprint);
+    if (existingDeviceUser) {
+      return res.status(400).json({ 
+        error: 'Device limit reached. A free trial has already been claimed from this device.',
+        requiresPayment: true 
+      });
+    }
+  }
+
   const clientKey = `cg-${crypto.randomBytes(16).toString('hex')}`;
   const hashedPassword = await bcrypt.hash(password, 10);
-  const trialExpiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
+  const trialExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // 7-day trial
   const status = 'active';
-  const initialCredit = 10.00;
+  const initialCredit = 0.00; // No free welcome credit
 
   try {
     db.prepare(`
       INSERT INTO clients (client_key, id, email, password_hash, device_fingerprint, budget_usd, current_spend_usd, trial_expires_at, status)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(clientKey, email.split('@')[0], email, hashedPassword, fingerprint || 'unknown', initialCredit, initialCredit, trialExpiresAt, status);
+    `).run(clientKey, email.split('@')[0], email, hashedPassword, fingerprint || 'unknown', budget || 10.00, initialCredit, trialExpiresAt, status);
 
     res.json({ success: true, apiKey: clientKey });
   } catch (err) {
@@ -1099,7 +1193,7 @@ app.post('/login', async (req, res) => {
 });
 
 app.use((req, res, next) => {
-  if (['/events', '/register', '/login', '/', '/terms', '/privacy', '/client/stats', '/forgot-password'].includes(req.path)) return next();
+  if (['/events', '/register', '/login', '/', '/terms', '/privacy', '/client/stats', '/client/budget', '/forgot-password'].includes(req.path)) return next();
 
   const clientKey = req.headers['x-cloudgrip-key'] || req.query.cloudgrip_key;
   if (!clientKey) return res.status(401).json({ error: 'Unauthorized: Missing key' });
@@ -1107,12 +1201,20 @@ app.use((req, res, next) => {
   const clientConfig = db.prepare('SELECT * FROM clients WHERE client_key = ?').get(clientKey);
   if (!clientConfig) return res.status(403).json({ error: 'Forbidden: Invalid API Key' });
 
+  // Enforce Trial Expiration and Payment Block
+  const now = new Date();
+  const trialExpiry = new Date(clientConfig.trial_expires_at);
+  if (now > trialExpiry && clientConfig.current_spend_usd <= 0) {
+    db.prepare("UPDATE clients SET status = 'expired' WHERE client_key = ?").run(clientKey);
+    return res.status(402).json({ error: 'Payment Required: Your 7-day free trial has expired. Please submit a subscription payment to reactivate your API key.' });
+  }
+
   req.clientConfig = clientConfig;
   next();
 });
 
 app.all(/.*/, async (req, res) => {
-  if (['/', '/register', '/login', '/events', '/terms', '/privacy', '/client/stats', '/forgot-password'].includes(req.path)) return;
+  if (['/', '/register', '/login', '/events', '/terms', '/privacy', '/client/stats', '/client/budget', '/forgot-password'].includes(req.path)) return;
 
   let statusCode = 502;
   let cost = 0.01;
