@@ -473,7 +473,8 @@ app.post('/register', async (req, res) => {
       trialActive: grantTrial
     });
   } catch (err) {
-    res.status(500).json({ error: 'Database error during registration.' });
+    console.error('Registration error:', err);
+    res.status(500).json({ error: 'Database error: ' + err.message });
   }
 });
 
