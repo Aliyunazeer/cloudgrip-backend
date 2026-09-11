@@ -50,7 +50,7 @@ app.post('/forgot-password', async (req, res) => {
   res.json({ success: true, message: 'Password recovery instructions sent to your email.' });
 });
 
-// Client Stats & Expiry Check (Robust fallback via client_key or email, cleaning null strings)
+// Client Stats & Expiry Check
 app.get('/client/stats', async (req, res) => {
   let clientKey = req.headers['x-cloudgrip-key'] || req.query.cloudgrip_key;
   if (!clientKey || clientKey === 'null' || clientKey === 'undefined') clientKey = null;
@@ -73,7 +73,7 @@ app.get('/client/stats', async (req, res) => {
   const trialExpiry = new Date(client.trial_expires_at);
   let status = client.status;
 
-  if (now > trialExpiry && client.current_spend_usd <= 0) {
+  if (now > trialExpiry && client.current_spend_usd >= (client.budget_cap_usd || 20.00)) {
     status = 'expired';
     await pool.query("UPDATE clients SET status = 'expired', client_key = NULL WHERE id = $1", [client.id]);
   }
@@ -83,13 +83,40 @@ app.get('/client/stats', async (req, res) => {
   res.json({
     success: true,
     currentSpendUSD: client.current_spend_usd,
-    budgetUSD: client.budget_usd,
+    budgetCapUSD: client.budget_cap_usd || 20.00,
     trialExpiresAt: client.trial_expires_at,
     status: status,
     email: client.email,
     client_key: client.client_key,
     logs: logsResult.rows
   });
+});
+
+// Update Hard Budget Cap Limit
+app.post('/client/budget-cap', async (req, res) => {
+  let clientKey = req.headers['x-cloudgrip-key'] || req.body.client_key;
+  if (!clientKey || clientKey === 'null' || clientKey === 'undefined') clientKey = null;
+  const { budgetCap, email } = req.body;
+
+  let client;
+  if (clientKey) {
+    const resClient = await pool.query('SELECT * FROM clients WHERE client_key = $1', [clientKey]);
+    client = resClient.rows[0];
+  }
+  if (!client && email) {
+    const resClient = await pool.query('SELECT * FROM clients WHERE email = $1', [email]);
+    client = resClient.rows[0];
+  }
+
+  if (!client) return res.status(403).json({ error: 'Unauthorized or account not found.' });
+
+  const capValue = parseFloat(budgetCap);
+  if (isNaN(capValue) || capValue <= 0) {
+    return res.status(400).json({ error: 'Invalid budget cap amount.' });
+  }
+
+  await pool.query('UPDATE clients SET budget_cap_usd = $1 WHERE id = $2', [capValue, client.id]);
+  res.json({ success: true, message: 'Gateway budget cap updated successfully.' });
 });
 
 // Initialize Paystack Subscription ($20 USD converted to NGN)
@@ -164,12 +191,11 @@ app.get('/api/topup/verify', async (req, res) => {
       const clientRes = await pool.query('SELECT * FROM clients WHERE email = $1', [email]);
       if (clientRes.rows.length > 0) {
         const newClientKey = `cg-${crypto.randomBytes(16).toString('hex')}`;
-        const addedValueUSD = parseFloat(amount) || 20.00;
         const newExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
         await pool.query(
-          'UPDATE clients SET client_key = $1, current_spend_usd = $2, budget_usd = $3, trial_expires_at = $4, status = $5 WHERE email = $6',
-          [newClientKey, addedValueUSD, addedValueUSD, newExpiry, 'active', email]
+          'UPDATE clients SET client_key = $1, current_spend_usd = 0.00, trial_expires_at = $2, status = $3 WHERE email = $4',
+          [newClientKey, newExpiry, 'active', email]
         );
 
         return res.redirect(`/?payment=success&new_key=${newClientKey}`);
@@ -236,9 +262,9 @@ app.post('/register', async (req, res) => {
 
   try {
     await pool.query(`
-      INSERT INTO clients (client_key, email, password_hash, device_fingerprint, budget_usd, current_spend_usd, trial_expires_at, status)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-    `, [clientKey, email, hashedPassword, fingerprint || 'unknown', 20.00, 0.00, trialExpiresAt, status]);
+      INSERT INTO clients (client_key, email, password_hash, device_fingerprint, budget_usd, current_spend_usd, budget_cap_usd, trial_expires_at, status)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    `, [clientKey, email, hashedPassword, fingerprint || 'unknown', 20.00, 0.00, 20.00, trialExpiresAt, status]);
 
     res.json({ 
       success: true, 
@@ -268,9 +294,9 @@ app.post('/login', async (req, res) => {
   });
 });
 
-// Middleware for proxy traffic only
+// Middleware for proxy traffic only with hard budget cap circuit breaker enforcement
 app.use(async (req, res, next) => {
-  if (['/events', '/register', '/login', '/', '/terms', '/privacy', '/client/stats', '/forgot-password'].includes(req.path) || req.path.startsWith('/api/topup/')) return next();
+  if (['/events', '/register', '/login', '/', '/terms', '/privacy', '/client/stats', '/client/budget-cap', '/forgot-password'].includes(req.path) || req.path.startsWith('/api/topup/')) return next();
   if (req.path.startsWith('/css/') || req.path.startsWith('/js/') || req.path.startsWith('/images/')) return next();
 
   const clientKey = req.headers['x-cloudgrip-key'] || req.query.cloudgrip_key;
@@ -283,7 +309,12 @@ app.use(async (req, res, next) => {
   const now = new Date();
   const trialExpiry = new Date(clientConfig.trial_expires_at);
 
-  if (now > trialExpiry && clientConfig.current_spend_usd <= 0) {
+  // Hard Budget Cap Circuit Breaker Check
+  if (clientConfig.current_spend_usd >= (clientConfig.budget_cap_usd || 20.00)) {
+    return res.status(402).json({ error: 'Circuit Breaker Triggered: Maximum budget cap reached. Please top up or increase your cap.' });
+  }
+
+  if (now > trialExpiry) {
     return res.status(402).json({ error: 'Payment Required: Subscription expired.' });
   }
 
@@ -292,7 +323,7 @@ app.use(async (req, res, next) => {
 });
 
 app.all(/.*/, async (req, res) => {
-  if (['/', '/register', '/login', '/events', '/terms', '/privacy', '/client/stats', '/forgot-password'].includes(req.path) || req.path.startsWith('/api/topup/')) return;
+  if (['/', '/register', '/login', '/events', '/terms', '/privacy', '/client/stats', '/client/budget-cap', '/forgot-password'].includes(req.path) || req.path.startsWith('/api/topup/')) return;
 
   let statusCode = 502;
   let cost = 0.01;
@@ -319,7 +350,7 @@ app.all(/.*/, async (req, res) => {
 
     let newSpend = req.clientConfig.current_spend_usd;
     if (response.ok) {
-      newSpend = Math.max(0, req.clientConfig.current_spend_usd - cost);
+      newSpend = req.clientConfig.current_spend_usd + cost;
       await pool.query('UPDATE clients SET current_spend_usd = $1 WHERE client_key = $2', [newSpend, req.clientConfig.client_key]);
     }
 
@@ -376,6 +407,7 @@ async function startServer() {
         device_fingerprint TEXT,
         budget_usd REAL NOT NULL,
         current_spend_usd REAL NOT NULL,
+        budget_cap_usd REAL DEFAULT 20.00,
         trial_expires_at TIMESTAMPTZ NOT NULL,
         status TEXT DEFAULT 'active'
       );

@@ -696,7 +696,7 @@
 
       <div class="stats-grid">
         <div class="stat-card">
-          <div class="label">Available Balance / Credit</div>
+          <div class="label">Total Proxy Traffic Spend</div>
           <div class="value" id="stat-spend">$0.0000</div>
         </div>
         <div class="stat-card">
@@ -727,6 +727,16 @@
           <div class="key-row">
             <div class="key-box" id="res-key"></div>
             <button class="btn" style="width: 110px; margin:0;" onclick="copyKey()">Copy Key</button>
+          </div>
+
+          <!-- Hard Budget Cap Configuration Panel -->
+          <div style="margin-top: 24px; border-top: 1px solid var(--border); padding-top: 20px;">
+            <h3>Gateway Hard Budget Cap</h3>
+            <p>Set a maximum USD spend threshold. Once reached, outgoing requests will automatically be blocked.</p>
+            <div class="key-row">
+              <input type="number" id="budget-cap-input" step="1.00" min="1.00" max="500.00" placeholder="20.00" style="flex: 1;">
+              <button class="btn" style="width: 140px; margin:0; background: #3b82f6; color: #fff;" onclick="updateBudgetCap()">Save Cap Limit</button>
+            </div>
           </div>
 
           <!-- Dynamic Subscription Panel (Hidden automatically for active paid users) -->
@@ -992,12 +1002,9 @@
         let url = '/client/stats';
         const headers = {};
         
-        // Safely sanitize key
         if (key && key !== 'null' && key !== 'undefined') {
           headers['x-cloudgrip-key'] = key;
         } 
-        
-        // Always pass email query param as fallback if available
         if (email) {
           url += '?email=' + encodeURIComponent(email);
         }
@@ -1015,6 +1022,10 @@
 
           document.getElementById('stat-spend').innerText = '$' + (data.currentSpendUSD || 0).toFixed(4);
           document.getElementById('stat-expiry').innerText = data.trialExpiresAt ? new Date(data.trialExpiresAt).toLocaleDateString() : 'Expired';
+          
+          if (data.budgetCapUSD) {
+            document.getElementById('budget-cap-input').value = data.budgetCapUSD;
+          }
 
           const statusEl = document.getElementById('stat-status');
           const now = new Date();
@@ -1056,6 +1067,33 @@
         }
       } catch(e) {
         console.error('Failed fetching stats', e);
+      }
+    }
+
+    async function updateBudgetCap() {
+      let key = localStorage.getItem('cloudgrip_key');
+      if (!key || key === 'null' || key === 'undefined') key = '';
+      const email = localStorage.getItem('cloudgrip_email');
+      const budgetCap = parseFloat(document.getElementById('budget-cap-input').value);
+
+      if (isNaN(budgetCap) || budgetCap <= 0) {
+        return alert('Please enter a valid budget cap value.');
+      }
+
+      try {
+        const res = await fetch('/client/budget-cap', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(key ? { 'x-cloudgrip-key': key } : {}) },
+          body: JSON.stringify({ budgetCap, email })
+        });
+        const data = await res.json();
+        if(data.success) {
+          alert('Budget cap successfully updated!');
+        } else {
+          alert(data.error || 'Failed to update budget cap.');
+        }
+      } catch(e) {
+        alert('Network connectivity error updating budget cap.');
       }
     }
 
