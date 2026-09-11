@@ -265,7 +265,7 @@ app.post('/login', async (req, res) => {
 });
 
 app.use((req, res, next) => {
-  if (['/events', '/register', '/login', '/', '/terms', '/privacy', '/client/stats', '/api/topup/initialize', '/api/topup/verify', '/forgot-password'].includes(req.path)) return next();
+  if (['/events', '/register', '/login', '/', '/terms', '/privacy', '/client/stats', '/forgot-password'].includes(req.path) || req.path.startsWith('/api/topup/')) return next();
   if (req.path.startsWith('/css/') || req.path.startsWith('/js/') || req.path.startsWith('/images/')) return next();
 
   const clientKey = req.headers['x-cloudgrip-key'] || req.query.cloudgrip_key;
@@ -286,7 +286,7 @@ app.use((req, res, next) => {
 });
 
 app.all(/.*/, async (req, res) => {
-  if (['/', '/register', '/login', '/events', '/terms', '/privacy', '/client/stats', '/api/topup/initialize', '/api/topup/verify', '/forgot-password'].includes(req.path)) return;
+  if (['/', '/register', '/login', '/events', '/terms', '/privacy', '/client/stats', '/forgot-password'].includes(req.path) || req.path.startsWith('/api/topup/')) return;
 
   let statusCode = 502;
   let cost = 0.01;
