@@ -18,10 +18,11 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const telemetryEmitter = new EventEmitter();
 
-// Connect to Supabase PostgreSQL
+// Connect to Supabase PostgreSQL (forced to IPv4 to prevent Render ENETUNREACH network errors)
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
+  ssl: { rejectUnauthorized: false },
+  family: 4
 });
 
 app.use(express.json({ limit: '10mb' }));
