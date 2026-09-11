@@ -709,7 +709,7 @@
         </div>
       </div>
 
-      <!-- Subscription Banner Inside Dashboard (Visible when Free/Expired) -->
+      <!-- Subscription Banner Inside Dashboard (Visible ONLY when Free/Expired) -->
       <div id="dashboard-sub-banner" class="panel hidden" style="background: rgba(16, 185, 129, 0.05); border-color: rgba(16, 185, 129, 0.2);">
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
           <div>
@@ -729,7 +729,8 @@
             <button class="btn" style="width: 110px; margin:0;" onclick="copyKey()">Copy Key</button>
           </div>
 
-          <div style="margin-top: 24px; border-top: 1px solid var(--border); padding-top: 20px;">
+          <!-- Dynamic Subscription Panel (Hidden automatically for active paid users) -->
+          <div id="sub-action-panel" style="margin-top: 24px; border-top: 1px solid var(--border); padding-top: 20px;">
             <h3>Monthly Subscription Pass ($20)</h3>
             <p>Renew your monthly subscription fee via Paystack to maintain uninterrupted API proxy access.</p>
             <button class="btn" style="background: #10b981; color: #090a0f;" onclick="updateBudget()">Pay Monthly Subscription ($20)</button>
@@ -772,7 +773,7 @@
     </div>
   </div>
 
-  <!-- Tiny Floating Upgrade Button -->
+  <!-- Tiny Floating Upgrade Button (Hidden automatically for active paid users) -->
   <button id="floating-upgrade-btn" class="floating-btn hidden" onclick="openSubModal()">
     ⚡ Upgrade to Pro ($20/mo)
   </button>
@@ -886,7 +887,7 @@
       hideMsg();
       const email = document.getElementById('su-email').value.trim();
       const password = document.getElementById('su-pass').value;
-      const budget = 20.00; // Fixed $20 monthly pass default
+      const budget = 20.00;
       const fingerprint = navigator.userAgent + screen.width + screen.height + (navigator.language || 'en');
       
       if(!email || !password) return showError('All fields are required.');
@@ -980,15 +981,21 @@
           if(isFreeOrExpired) {
             statusEl.innerText = 'Expired / Unpaid';
             statusEl.style.color = 'var(--error-text)';
-            // Show renewal banner and floating upgrade button & pop modal automatically
+            
+            // Show subscription options for expired/unpaid users
             document.getElementById('dashboard-sub-banner').classList.remove('hidden');
             document.getElementById('floating-upgrade-btn').classList.remove('hidden');
+            document.getElementById('sub-action-panel').classList.remove('hidden');
             openSubModal();
           } else {
             statusEl.innerText = 'Active Pro Tier';
             statusEl.style.color = 'var(--success-text)';
+            
+            // HIDE all payment buttons and banners for active paid users!
             document.getElementById('dashboard-sub-banner').classList.add('hidden');
             document.getElementById('floating-upgrade-btn').classList.add('hidden');
+            document.getElementById('sub-action-panel').classList.add('hidden');
+            closeSubModal();
           }
 
           if(data.logs && data.logs.length > 0) {
@@ -1005,7 +1012,7 @@
 
     async function updateBudget() {
       const key = localStorage.getItem('cloudgrip_key');
-      const fixedAmount = 20.00; // Fixed subscription price
+      const fixedAmount = 20.00;
 
       try {
         const res = await fetch('/api/topup/initialize', {

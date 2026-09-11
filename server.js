@@ -120,8 +120,12 @@ app.post('/api/topup/initialize', async (req, res) => {
   const client = db.prepare('SELECT * FROM clients WHERE client_key = ?').get(clientKey);
   if (!client) return res.status(403).json({ error: 'Forbidden' });
 
-  // Fixed monthly subscription fee of $20 USD (ignores client-side inputs)
-  const amount = 20.00;
+  // Fixed monthly subscription fee of $20 USD
+  const amountUSD = 20.00;
+  
+  // Convert $20 USD to NGN (Default rate: 1500 NGN per USD, customizable via process.env.USD_NGN_RATE)
+  const usdToNgnRate = parseFloat(process.env.USD_NGN_RATE) || 1500;
+  const amountNGN = amountUSD * usdToNgnRate;
 
   const paystackSecret = process.env.PAYSTACK_SECRET_KEY;
   if (!paystackSecret) {
@@ -130,11 +134,12 @@ app.post('/api/topup/initialize', async (req, res) => {
 
   try {
     const cleanBaseUrl = (process.env.BASE_URL || 'https://cloudgrip-ai.onrender.com').replace(/\/+$/, '');
-    const callbackUrl = `${cleanBaseUrl}/api/topup/verify?client_key=${clientKey}&amount=${amount}`;
+    const callbackUrl = `${cleanBaseUrl}/api/topup/verify?client_key=${clientKey}&amount=${amountUSD}`;
 
     const paystackResponse = await axios.post('https://api.paystack.co/transaction/initialize', {
       email: client.email,
-      amount: Math.round(amount * 100), // $20 in kobo/cents
+      amount: Math.round(amountNGN * 100), // Converts Naira to Kobo for Paystack
+      currency: 'NGN',
       callback_url: callbackUrl
     }, {
       headers: {
