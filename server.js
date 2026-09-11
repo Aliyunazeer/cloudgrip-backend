@@ -120,10 +120,8 @@ app.post('/api/topup/initialize', async (req, res) => {
   const client = db.prepare('SELECT * FROM clients WHERE client_key = ?').get(clientKey);
   if (!client) return res.status(403).json({ error: 'Forbidden' });
 
-  const { amount } = req.body || {};
-  if (typeof amount !== 'number' || amount <= 0) {
-    return res.status(400).json({ error: 'Invalid payment amount.' });
-  }
+  // Fixed monthly subscription fee of $20 USD (ignores client-side inputs)
+  const amount = 20.00;
 
   const paystackSecret = process.env.PAYSTACK_SECRET_KEY;
   if (!paystackSecret) {
@@ -136,7 +134,7 @@ app.post('/api/topup/initialize', async (req, res) => {
 
     const paystackResponse = await axios.post('https://api.paystack.co/transaction/initialize', {
       email: client.email,
-      amount: Math.round(amount * 100),
+      amount: Math.round(amount * 100), // $20 in kobo/cents
       callback_url: callbackUrl
     }, {
       headers: {
@@ -177,7 +175,7 @@ app.get('/api/topup/verify', async (req, res) => {
     if (txData && txData.status && txData.data.status === 'success') {
       const client = db.prepare('SELECT * FROM clients WHERE client_key = ?').get(client_key);
       if (client) {
-        const addedValueUSD = parseFloat(amount) || 10;
+        const addedValueUSD = parseFloat(amount) || 20.00;
         const newSpend = client.current_spend_usd + addedValueUSD;
         const newExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
@@ -246,7 +244,7 @@ app.post('/register', async (req, res) => {
     db.prepare(`
       INSERT INTO clients (client_key, id, email, password_hash, device_fingerprint, budget_usd, current_spend_usd, trial_expires_at, status)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(clientKey, email.split('@')[0], email, hashedPassword, fingerprint || 'unknown', budget || 10.00, initialCredit, trialExpiresAt, status);
+    `).run(clientKey, email.split('@')[0], email, hashedPassword, fingerprint || 'unknown', budget || 20.00, initialCredit, trialExpiresAt, status);
 
     res.json({ success: true, apiKey: clientKey });
   } catch (err) {
