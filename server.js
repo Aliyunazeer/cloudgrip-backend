@@ -24,12 +24,12 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-// Initialize PostgreSQL Tables
+// Initialize PostgreSQL Tables with correct nullable client_key schema
 async function initDB() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS clients (
-      client_key TEXT PRIMARY KEY,
-      id TEXT NOT NULL,
+      id SERIAL PRIMARY KEY,
+      client_key TEXT UNIQUE,
       email TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
       device_fingerprint TEXT,
@@ -137,7 +137,6 @@ app.post('/api/topup/initialize', async (req, res) => {
 
   try {
     const cleanBaseUrl = (process.env.BASE_URL || 'https://cloudgrip-ai.onrender.com').replace(/\/+$/, '');
-    // Pass email and client id in callback to handle expired/revoked key cases
     const callbackUrl = `${cleanBaseUrl}/api/topup/verify?email=${encodeURIComponent(client.email)}&amount=${amountUSD}`;
 
     const paystackResponse = await axios.post('https://api.paystack.co/transaction/initialize', {
@@ -190,7 +189,6 @@ app.get('/api/topup/verify', async (req, res) => {
           [newClientKey, addedValueUSD, addedValueUSD, newExpiry, 'active', email]
         );
 
-        // Store new key in cookie or redirect with it
         return res.redirect(`/?payment=success&new_key=${newClientKey}`);
       }
     }
@@ -223,7 +221,7 @@ app.get('/events', async (req, res) => {
   req.on('close', () => telemetryEmitter.off('telemetry', onTelemetry));
 });
 
-// Registration: Same-device users can register, but NO free trial key is generated unless it's a new device
+// Registration: New devices get free trial key; same-device users register without key until they pay
 app.post('/register', async (req, res) => {
   const { email, password, fingerprint } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: 'Email and password required.' });
@@ -231,12 +229,11 @@ app.post('/register', async (req, res) => {
   const existingUser = await pool.query('SELECT * FROM clients WHERE email = $1', [email]);
   if (existingUser.rows.length > 0) return res.status(400).json({ error: 'Email already registered. Please sign in.' });
 
-  // Check if device fingerprint exists
   let isNewDevice = true;
   if (fingerprint) {
     const deviceCheck = await pool.query('SELECT * FROM clients WHERE device_fingerprint = $1', [fingerprint]);
     if (deviceCheck.rows.length > 0) {
-      isNewDevice = false; // Same device!
+      isNewDevice = false;
     }
   }
 
@@ -247,20 +244,18 @@ app.post('/register', async (req, res) => {
   let status = 'pending_payment';
 
   if (isNewDevice) {
-    // New device gets 7-day free trial & generated API key
     clientKey = `cg-${crypto.randomBytes(16).toString('hex')}`;
     trialExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
     status = 'active';
   } else {
-    // Same device: Account created, but NO API key until payment
-    trialExpiresAt = new Date().toISOString(); // Expired immediately until paid
+    trialExpiresAt = new Date().toISOString();
   }
 
   try {
     await pool.query(`
-      INSERT INTO clients (client_key, id, email, password_hash, device_fingerprint, budget_usd, current_spend_usd, trial_expires_at, status)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-    `, [clientKey, email.split('@')[0], email, hashedPassword, fingerprint || 'unknown', 20.00, 0.00, trialExpiresAt, status]);
+      INSERT INTO clients (client_key, email, password_hash, device_fingerprint, budget_usd, current_spend_usd, trial_expires_at, status)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    `, [clientKey, email, hashedPassword, fingerprint || 'unknown', 20.00, 0.00, trialExpiresAt, status]);
 
     res.json({ 
       success: true, 
@@ -269,6 +264,7 @@ app.post('/register', async (req, res) => {
       message: isNewDevice ? '7-day trial activated!' : 'Account created. Please complete subscription payment to generate your API key.'
     });
   } catch (err) {
+    console.error('Registration Error:', err.message);
     res.status(500).json({ error: 'Database error: ' + err.message });
   }
 });
