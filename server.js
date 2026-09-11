@@ -24,38 +24,6 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-// Initialize PostgreSQL Tables (Drops old mismatched tables and creates clean schema)
-async function initDB() {
-  await pool.query(`
-    DROP TABLE IF EXISTS request_logs;
-    DROP TABLE IF EXISTS clients;
-
-    CREATE TABLE clients (
-      id SERIAL PRIMARY KEY,
-      client_key TEXT UNIQUE,
-      email TEXT UNIQUE NOT NULL,
-      password_hash TEXT NOT NULL,
-      device_fingerprint TEXT,
-      budget_usd REAL NOT NULL,
-      current_spend_usd REAL NOT NULL,
-      trial_expires_at TIMESTAMPTZ NOT NULL,
-      status TEXT DEFAULT 'active'
-    );
-
-    CREATE TABLE request_logs (
-      id SERIAL PRIMARY KEY,
-      client_key TEXT,
-      method TEXT,
-      endpoint TEXT,
-      status_code INT,
-      cost REAL,
-      timestamp TIMESTAMPTZ DEFAULT NOW()
-    );
-  `);
-  console.log('[CloudGrip Engine] Connected to Supabase PostgreSQL & Fresh Tables Created');
-}
-initDB().catch(console.error);
-
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -81,7 +49,7 @@ app.post('/forgot-password', async (req, res) => {
   res.json({ success: true, message: 'Password recovery instructions sent to your email.' });
 });
 
-// Client Stats & Expiry / Key Revocation Check
+// Client Stats & Expiry Check
 app.get('/client/stats', async (req, res) => {
   const clientKey = req.headers['x-cloudgrip-key'] || req.query.cloudgrip_key;
   if (!clientKey) return res.status(401).json({ error: 'Unauthorized' });
@@ -94,7 +62,6 @@ app.get('/client/stats', async (req, res) => {
   const trialExpiry = new Date(client.trial_expires_at);
   let status = client.status;
 
-  // If expired, wipe/revoke the API key so they are forced to subscribe
   if (now > trialExpiry && client.current_spend_usd <= 0) {
     status = 'expired';
     await pool.query("UPDATE clients SET status = 'expired', client_key = NULL WHERE client_key = $1", [clientKey]);
@@ -116,7 +83,7 @@ app.get('/client/stats', async (req, res) => {
 // Initialize Paystack Subscription ($20 USD converted to NGN)
 app.post('/api/topup/initialize', async (req, res) => {
   const clientKey = req.headers['x-cloudgrip-key'] || req.body.client_key;
-  const email = req.body.email; // Fallback if key was wiped due to expiration
+  const email = req.body.email;
 
   let client;
   if (clientKey) {
@@ -182,7 +149,6 @@ app.get('/api/topup/verify', async (req, res) => {
     if (txData && txData.status && txData.data.status === 'success') {
       const clientRes = await pool.query('SELECT * FROM clients WHERE email = $1', [email]);
       if (clientRes.rows.length > 0) {
-        // Generate a FRESH new API key upon successful payment
         const newClientKey = `cg-${crypto.randomBytes(16).toString('hex')}`;
         const addedValueUSD = parseFloat(amount) || 20.00;
         const newExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
@@ -224,7 +190,7 @@ app.get('/events', async (req, res) => {
   req.on('close', () => telemetryEmitter.off('telemetry', onTelemetry));
 });
 
-// Registration: New devices get free trial key; same-device users register without key until they pay
+// Registration
 app.post('/register', async (req, res) => {
   const { email, password, fingerprint } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: 'Email and password required.' });
@@ -379,6 +345,41 @@ app.all(/.*/, async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`[CloudGrip Engine] Live on port ${PORT}`);
-});
+// Start server ONLY after tables are initialized to prevent race conditions
+async function startServer() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS clients (
+        id SERIAL PRIMARY KEY,
+        client_key TEXT UNIQUE,
+        email TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        device_fingerprint TEXT,
+        budget_usd REAL NOT NULL,
+        current_spend_usd REAL NOT NULL,
+        trial_expires_at TIMESTAMPTZ NOT NULL,
+        status TEXT DEFAULT 'active'
+      );
+
+      CREATE TABLE IF NOT EXISTS request_logs (
+        id SERIAL PRIMARY KEY,
+        client_key TEXT,
+        method TEXT,
+        endpoint TEXT,
+        status_code INT,
+        cost REAL,
+        timestamp TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+    console.log('[CloudGrip Engine] Connected to Supabase PostgreSQL & Tables Verified');
+
+    app.listen(PORT, () => {
+      console.log(`[CloudGrip Engine] Live on port ${PORT}`);
+    });
+  } catch (err) {
+    console.error('Failed to initialize database:', err);
+    process.exit(1);
+  }
+}
+
+startServer();
