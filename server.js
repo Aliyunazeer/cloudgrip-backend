@@ -24,10 +24,13 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-// Initialize PostgreSQL Tables with correct nullable client_key schema
+// Initialize PostgreSQL Tables (Drops old mismatched tables and creates clean schema)
 async function initDB() {
   await pool.query(`
-    CREATE TABLE IF NOT EXISTS clients (
+    DROP TABLE IF EXISTS request_logs;
+    DROP TABLE IF EXISTS clients;
+
+    CREATE TABLE clients (
       id SERIAL PRIMARY KEY,
       client_key TEXT UNIQUE,
       email TEXT UNIQUE NOT NULL,
@@ -39,7 +42,7 @@ async function initDB() {
       status TEXT DEFAULT 'active'
     );
 
-    CREATE TABLE IF NOT EXISTS request_logs (
+    CREATE TABLE request_logs (
       id SERIAL PRIMARY KEY,
       client_key TEXT,
       method TEXT,
@@ -49,7 +52,7 @@ async function initDB() {
       timestamp TIMESTAMPTZ DEFAULT NOW()
     );
   `);
-  console.log('[CloudGrip Engine] Connected to Supabase PostgreSQL & Tables Verified');
+  console.log('[CloudGrip Engine] Connected to Supabase PostgreSQL & Fresh Tables Created');
 }
 initDB().catch(console.error);
 
