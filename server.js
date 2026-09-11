@@ -131,7 +131,8 @@ app.post('/api/topup/initialize', async (req, res) => {
   }
 
   try {
-   const callbackUrl = `${process.env.BASE_URL || 'https://cloudgrip-ai.onrender.com'}/api/topup/verify?client_key=${clientKey}&amount=${amount}`;
+    const cleanBaseUrl = (process.env.BASE_URL || 'https://cloudgrip-ai.onrender.com').replace(/\/+$/, '');
+    const callbackUrl = `${cleanBaseUrl}/api/topup/verify?client_key=${clientKey}&amount=${amount}`;
 
     const paystackResponse = await axios.post('https://api.paystack.co/transaction/initialize', {
       email: client.email,
