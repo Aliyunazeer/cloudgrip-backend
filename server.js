@@ -50,13 +50,22 @@ app.post('/forgot-password', async (req, res) => {
   res.json({ success: true, message: 'Password recovery instructions sent to your email.' });
 });
 
-// Client Stats & Expiry Check
+// Client Stats & Expiry Check (Supports email lookup fallback for expired/revoked keys)
 app.get('/client/stats', async (req, res) => {
   const clientKey = req.headers['x-cloudgrip-key'] || req.query.cloudgrip_key;
-  if (!clientKey) return res.status(401).json({ error: 'Unauthorized' });
+  const email = req.query.email;
 
-  const result = await pool.query('SELECT * FROM clients WHERE client_key = $1', [clientKey]);
-  if (result.rows.length === 0) return res.status(403).json({ error: 'Forbidden' });
+  if (!clientKey && !email) return res.status(401).json({ error: 'Unauthorized' });
+
+  let result;
+  if (clientKey) {
+    result = await pool.query('SELECT * FROM clients WHERE client_key = $1', [clientKey]);
+  }
+  if ((!result || result.rows.length === 0) && email) {
+    result = await pool.query('SELECT * FROM clients WHERE email = $1', [email]);
+  }
+
+  if (!result || result.rows.length === 0) return res.status(403).json({ error: 'Forbidden' });
 
   const client = result.rows[0];
   const now = new Date();
@@ -65,11 +74,10 @@ app.get('/client/stats', async (req, res) => {
 
   if (now > trialExpiry && client.current_spend_usd <= 0) {
     status = 'expired';
-    await pool.query("UPDATE clients SET status = 'expired' WHERE client_key = $1", [clientKey]);
-    return res.status(402).json({ error: 'Subscription expired. Please renew subscription.', status: 'expired' });
+    await pool.query("UPDATE clients SET status = 'expired' WHERE id = $1", [client.id]);
   }
 
-  const logsResult = await pool.query('SELECT * FROM request_logs WHERE client_key = $1 ORDER BY id DESC LIMIT 10', [clientKey]);
+  const logsResult = await pool.query('SELECT * FROM request_logs WHERE client_key = $1 ORDER BY id DESC LIMIT 10', [client.client_key || '']);
 
   res.json({
     success: true,
@@ -77,6 +85,7 @@ app.get('/client/stats', async (req, res) => {
     budgetUSD: client.budget_usd,
     trialExpiresAt: client.trial_expires_at,
     status: status,
+    email: client.email,
     logs: logsResult.rows
   });
 });
@@ -84,13 +93,14 @@ app.get('/client/stats', async (req, res) => {
 // Initialize Paystack Subscription ($20 USD converted to NGN)
 app.post('/api/topup/initialize', async (req, res) => {
   const clientKey = req.headers['x-cloudgrip-key'] || req.body.client_key;
-  const email = req.body.email;
+  const email = req.body.email || req.query.email;
 
   let client;
   if (clientKey) {
     const resClient = await pool.query('SELECT * FROM clients WHERE client_key = $1', [clientKey]);
     client = resClient.rows[0];
-  } else if (email) {
+  } 
+  if (!client && email) {
     const resClient = await pool.query('SELECT * FROM clients WHERE email = $1', [email]);
     client = resClient.rows[0];
   }
@@ -194,7 +204,7 @@ app.get('/events', async (req, res) => {
 // Registration
 app.post('/register', async (req, res) => {
   const { email, password, fingerprint } = req.body || {};
-  if (!email || !password) return res.status(400).json({ error: 'Email and password required.' });
+  if (!email || !password) return res.status(400).json({ error: 'Email and password record required.' });
 
   const existingUser = await pool.query('SELECT * FROM clients WHERE email = $1', [email]);
   if (existingUser.rows.length > 0) return res.status(400).json({ error: 'Email already registered. Please sign in.' });
@@ -230,6 +240,7 @@ app.post('/register', async (req, res) => {
     res.json({ 
       success: true, 
       apiKey: clientKey, 
+      email: email,
       requiresPayment: !isNewDevice,
       message: isNewDevice ? '7-day trial activated!' : 'Account created. Please complete subscription payment to generate your API key.'
     });
@@ -247,7 +258,7 @@ app.post('/login', async (req, res) => {
     return res.status(401).json({ error: 'Invalid email or password.' });
   }
 
-  res.json({ success: true, apiKey: userRes.rows[0].client_key });
+  res.json({ success: true, apiKey: userRes.rows[0].client_key, email: userRes.rows[0].email });
 });
 
 app.use(async (req, res, next) => {
@@ -265,7 +276,6 @@ app.use(async (req, res, next) => {
   const trialExpiry = new Date(clientConfig.trial_expires_at);
 
   if (now > trialExpiry && clientConfig.current_spend_usd <= 0) {
-    await pool.query("UPDATE clients SET status = 'expired' WHERE client_key = $1", [clientKey]);
     return res.status(402).json({ error: 'Payment Required: Subscription expired.' });
   }
 
