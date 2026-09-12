@@ -1,15 +1,18 @@
 {
-  "name": "cloudgrip-backend",
+  "name": "cloudgrip-proxy",
   "version": "1.0.0",
-  "description": "",
+  "description": "Hard-cap LLM budgets and stop runaway agent loops locally.",
   "main": "server.js",
   "type": "module",
+  "bin": {
+    "cloudgrip-proxy": "./server.js"
+  },
   "scripts": {
     "start": "node server.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": ["ai", "proxy", "rate-limit", "budget-cap", "llm"],
+  "author": "Aliyu Nazeer",
+  "license": "MIT",
   "dependencies": {
     "@upstash/redis": "^1.38.4",
     "axios": "^1.20.0",
