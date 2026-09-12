@@ -50,15 +50,16 @@ app.post('/forgot-password', async (req, res) => {
   res.json({ success: true, message: 'Password recovery instructions sent to your email.' });
 });
 
-// Client Stats & Expiry Check (Robust fallback via client_key or email)
+// Client Stats & Expiry Check (Robust fallback via client_key or email, cleaning null strings)
 app.get('/client/stats', async (req, res) => {
-  const clientKey = req.headers['x-cloudgrip-key'] || req.query.cloudgrip_key;
+  let clientKey = req.headers['x-cloudgrip-key'] || req.query.cloudgrip_key;
+  if (!clientKey || clientKey === 'null' || clientKey === 'undefined') clientKey = null;
   const email = req.query.email;
 
   if (!clientKey && !email) return res.status(401).json({ error: 'Unauthorized' });
 
   let result;
-  if (clientKey && clientKey !== 'null' && clientKey !== 'undefined') {
+  if (clientKey) {
     result = await pool.query('SELECT * FROM clients WHERE client_key = $1', [clientKey]);
   }
   if ((!result || result.rows.length === 0) && email) {
@@ -74,7 +75,6 @@ app.get('/client/stats', async (req, res) => {
 
   if (now > trialExpiry && client.current_spend_usd <= 0) {
     status = 'expired';
-    // Revoke key if expired, but keep record intact
     await pool.query("UPDATE clients SET status = 'expired', client_key = NULL WHERE id = $1", [client.id]);
   }
 
@@ -94,11 +94,12 @@ app.get('/client/stats', async (req, res) => {
 
 // Initialize Paystack Subscription ($20 USD converted to NGN)
 app.post('/api/topup/initialize', async (req, res) => {
-  const clientKey = req.headers['x-cloudgrip-key'] || req.body.client_key;
+  let clientKey = req.headers['x-cloudgrip-key'] || req.body.client_key;
+  if (!clientKey || clientKey === 'null' || clientKey === 'undefined') clientKey = null;
   const email = req.body.email || req.query.email;
 
   let client;
-  if (clientKey && clientKey !== 'null' && clientKey !== 'undefined') {
+  if (clientKey) {
     const resClient = await pool.query('SELECT * FROM clients WHERE client_key = $1', [clientKey]);
     client = resClient.rows[0];
   } 
@@ -273,7 +274,7 @@ app.use(async (req, res, next) => {
   if (req.path.startsWith('/css/') || req.path.startsWith('/js/') || req.path.startsWith('/images/')) return next();
 
   const clientKey = req.headers['x-cloudgrip-key'] || req.query.cloudgrip_key;
-  if (!clientKey) return res.status(401).json({ error: 'Unauthorized: Missing key' });
+  if (!clientKey || clientKey === 'null' || clientKey === 'undefined') return res.status(401).json({ error: 'Unauthorized: Missing key' });
 
   const clientRes = await pool.query('SELECT * FROM clients WHERE client_key = $1', [clientKey]);
   if (clientRes.rows.length === 0) return res.status(403).json({ error: 'Forbidden: Invalid or Revoked API Key' });
