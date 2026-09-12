@@ -135,6 +135,9 @@ app.get('/analytics', requireAdmin, async (req, res) => {
     const activeSubsRes = await pool.query("SELECT COUNT(*) FROM clients WHERE status = 'active'");
     const totalVisitsRes = await pool.query('SELECT COUNT(*) FROM site_visits');
     
+    const clientsRes = await pool.query('SELECT id, email, client_key, budget_cap_usd, current_spend_usd, status, is_verified FROM clients ORDER BY id DESC');
+    const logsRes = await pool.query('SELECT * FROM request_logs ORDER BY id DESC LIMIT 15');
+
     res.send(`<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -150,7 +153,7 @@ app.get('/analytics', requireAdmin, async (req, res) => {
             padding: 40px 20px;
         }
         .container {
-            max-width: 900px;
+            max-width: 1100px;
             margin: 0 auto;
         }
         .header {
@@ -166,6 +169,15 @@ app.get('/analytics', requireAdmin, async (req, res) => {
             font-weight: 600;
             color: #f8fafc;
             margin: 0;
+        }
+        h2 {
+            font-size: 16px;
+            font-weight: 600;
+            color: #94a3b8;
+            margin-top: 40px;
+            margin-bottom: 16px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
         }
         .logout-btn {
             color: #ef4444;
@@ -185,7 +197,7 @@ app.get('/analytics', requireAdmin, async (req, res) => {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
             gap: 20px;
-            margin-bottom: 40px;
+            margin-bottom: 20px;
         }
         .card {
             background: #131b2e;
@@ -207,6 +219,43 @@ app.get('/analytics', requireAdmin, async (req, res) => {
             font-weight: 700;
             color: #10b981;
         }
+        .table-container {
+            background: #131b2e;
+            border: 1px solid #1e293b;
+            border-radius: 10px;
+            overflow-x: auto;
+            margin-bottom: 40px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 13.5px;
+        }
+        th, td {
+            padding: 14px 18px;
+            border-bottom: 1px solid #1e293b;
+        }
+        th {
+            background: #0f172a;
+            color: #94a3b8;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.05em;
+        }
+        tr:last-child td {
+            border-bottom: none;
+        }
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 11.5px;
+            font-weight: 500;
+        }
+        .badge-active { background: rgba(16, 185, 129, 0.15); color: #34d399; }
+        .badge-pending { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
     </style>
 </head>
 <body>
@@ -228,6 +277,63 @@ app.get('/analytics', requireAdmin, async (req, res) => {
                 <h3>Total Site Visits</h3>
                 <p>${totalVisitsRes.rows[0].count}</p>
             </div>
+        </div>
+
+        <h2>Registered Users & Clients</h2>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Email</th>
+                        <th>API Key Prefix</th>
+                        <th>Spend / Cap</th>
+                        <th>Status</th>
+                        <th>Verified</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${clientsRes.rows.map(client => `
+                        <tr>
+                            <td>#${client.id}</td>
+                            <td>${client.email}</td>
+                            <td style="font-family: monospace; color: #94a3b8;">${client.client_key ? client.client_key.substring(0, 10) + '...' : 'None'}</td>
+                            <td>$${parseFloat(client.current_spend_usd \vert{}\vert{} 0).toFixed(2)} /$${parseFloat(client.budget_cap_usd || 15).toFixed(2)}</td>
+                            <td><span class="badge ${client.status === 'active' ? 'badge-active' : 'badge-pending'}">${client.status}</span></td>
+                            <td>${client.is_verified ? '✅ Yes' : '⏳ Pending'}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Recent Proxy Request Logs</h2>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Log ID</th>
+                        <th>Method</th>
+                        <th>Endpoint</th>
+                        <th>Status</th>
+                        <th>Cost</th>
+                        <th>Timestamp</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${logsRes.rows.length === 0 ? `<tr><td colspan="6" style="text-align: center; color: #94a3b8;">No proxy requests logged yet.</td></tr>` : 
+                        logsRes.rows.map(log => `
+                            <tr>
+                                <td>#${log.id}</td>
+                                <td><b>${log.method}</b></td>
+                                <td style="font-family: monospace;">${log.endpoint}</td>
+                                <td>${log.status_code}</td>                                 <td>$${parseFloat(log.cost || 0).toFixed(4)}</td>
+                                <td>${new Date(log.timestamp).toLocaleString()}</td>
+                            </tr>
+                        `).join('')
+                    }
+                </tbody>
+            </table>
         </div>
     </div>
 </body>
