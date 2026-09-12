@@ -190,7 +190,7 @@ app.post('/client/budget-cap', async (req, res) => {
   res.json({ success: true, message: 'Budget cap updated.' });
 });
 
-// Registration with Real Email Dispatch via Nodemailer
+// Registration with Non-Blocking Background Email Dispatch
 app.post('/register', async (req, res) => {
   try {
     const { email, password, fingerprint } = req.body || {};
@@ -203,13 +203,13 @@ app.post('/register', async (req, res) => {
         const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
         await pool.query('UPDATE clients SET otp_code = $1, otp_expires_at = $2 WHERE email = $3', [otpCode, expiresAt, email]);
         
-        // Dispatch real email
-        await transporter.sendMail({
+        // Non-blocking background email dispatch
+        transporter.sendMail({
           from: '"CloudGrip Security" <no-reply@cloudgrip.ai>',
           to: email,
           subject: 'Your CloudGrip Verification Code',
           text: `Your new 6-digit verification code is: ${otpCode}. It expires in 10 minutes.`
-        });
+        }).catch(err => console.error('Background Email Error:', err.message));
 
         return res.json({ success: false, requiresOtp: true, message: 'Unverified account. New 6-digit OTP code sent to your email.' });
       }
@@ -227,13 +227,13 @@ app.post('/register', async (req, res) => {
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
     `, [clientKey, email, hashedPassword, fingerprint || 'unknown', 15.00, 0.00, 15.00, trialExpiresAt, 'pending_verification', otpCode, otpExpiresAt, false]);
 
-    // Dispatch real email via Nodemailer
-    await transporter.sendMail({
+    // Non-blocking background email dispatch
+    transporter.sendMail({
       from: '"CloudGrip Security" <no-reply@cloudgrip.ai>',
       to: email,
       subject: 'Your CloudGrip Verification Code',
       text: `Your 6-digit verification code is: ${otpCode}. It expires in 10 minutes.`
-    });
+    }).catch(err => console.error('Background Email Error:', err.message));
 
     res.json({ 
       success: false, 
@@ -242,8 +242,8 @@ app.post('/register', async (req, res) => {
       message: 'Verification code sent successfully to your email.'
     });
   } catch (err) {
-    console.error('Registration/Email Error:', err.message);
-    res.status(500).json({ error: 'Failed to send verification email. Please check server configuration.' });
+    console.error('Registration Error:', err.message);
+    res.status(500).json({ error: 'Server error during registration.' });
   }
 });
 
@@ -288,13 +288,13 @@ app.post('/login', async (req, res) => {
       const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
       await pool.query('UPDATE clients SET otp_code = $1, otp_expires_at = $2 WHERE email = $3', [otpCode, expiresAt, email]);
       
-      // Dispatch real email on login attempt if unverified
-      await transporter.sendMail({
+      // Non-blocking background email dispatch on unverified login attempt
+      transporter.sendMail({
         from: '"CloudGrip Security" <no-reply@cloudgrip.ai>',
         to: email,
         subject: 'Your CloudGrip Verification Code',
         text: `Your 6-digit verification code is: ${otpCode}. It expires in 10 minutes.`
-      });
+      }).catch(err => console.error('Background Email Error:', err.message));
 
       return res.status(403).json({ 
         success: false, 
