@@ -65,8 +65,8 @@ app.get('/client/stats', async (req, res) => {
 
   if (now > trialExpiry && client.current_spend_usd <= 0) {
     status = 'expired';
-    await pool.query("UPDATE clients SET status = 'expired', client_key = NULL WHERE client_key = $1", [clientKey]);
-    return res.status(402).json({ error: 'Subscription expired. API key revoked. Please renew subscription.', status: 'expired' });
+    await pool.query("UPDATE clients SET status = 'expired' WHERE client_key = $1", [clientKey]);
+    return res.status(402).json({ error: 'Subscription expired. Please renew subscription.', status: 'expired' });
   }
 
   const logsResult = await pool.query('SELECT * FROM request_logs WHERE client_key = $1 ORDER BY id DESC LIMIT 10', [clientKey]);
@@ -265,8 +265,8 @@ app.use(async (req, res, next) => {
   const trialExpiry = new Date(clientConfig.trial_expires_at);
 
   if (now > trialExpiry && clientConfig.current_spend_usd <= 0) {
-    await pool.query("UPDATE clients SET status = 'expired', client_key = NULL WHERE client_key = $1", [clientKey]);
-    return res.status(402).json({ error: 'Payment Required: Subscription expired. API key revoked.' });
+    await pool.query("UPDATE clients SET status = 'expired' WHERE client_key = $1", [clientKey]);
+    return res.status(402).json({ error: 'Payment Required: Subscription expired.' });
   }
 
   req.clientConfig = clientConfig;
