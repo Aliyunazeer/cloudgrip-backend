@@ -133,10 +133,107 @@ app.get('/analytics', requireAdmin, async (req, res) => {
   try {
     const usersCountRes = await pool.query('SELECT COUNT(*) FROM clients');
     const activeSubsRes = await pool.query("SELECT COUNT(*) FROM clients WHERE status = 'active'");
-    res.send(`<!DOCTYPE html><html><head><title>Analytics</title><style>body{background:#0b0f19;color:#fff;font-family:sans-serif;padding:30px;}</style></head>
-    <body><h1>CloudGrip Analytics</h1><p>Total Users: ${usersCountRes.rows[0].count} | Active: ${activeSubsRes.rows[0].count}</p>
-    <a href="/admin/logout" style="color:#ef4444;">Logout</a></body></html>`);
+    const totalVisitsRes = await pool.query('SELECT COUNT(*) FROM site_visits');
+    
+    res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CloudGrip Analytics Dashboard</title>
+    <style>
+        body {
+            background-color: #0b0f19;
+            color: #f8fafc;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 40px 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+            border-bottom: 1px solid #1e293b;
+            padding-bottom: 16px;
+        }
+        h1 {
+            font-size: 22px;
+            font-weight: 600;
+            color: #f8fafc;
+            margin: 0;
+        }
+        .logout-btn {
+            color: #ef4444;
+            text-decoration: none;
+            font-size: 13.5px;
+            font-weight: 500;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            padding: 6px 14px;
+            border-radius: 6px;
+            transition: background 0.2s, border-color 0.2s;
+        }
+        .logout-btn:hover {
+            background: rgba(239, 68, 68, 0.1);
+            border-color: #ef4444;
+        }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        .card {
+            background: #131b2e;
+            border: 1px solid #1e293b;
+            padding: 24px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        .card h3 {
+            margin: 0 0 8px 0;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #94a3b8;
+        }
+        .card p {
+            margin: 0;
+            font-size: 32px;
+            font-weight: 700;
+            color: #10b981;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>CloudGrip Analytics</h1>
+            <a href="/admin/logout" class="logout-btn">Logout</a>
+        </div>
+        <div class="metrics-grid">
+            <div class="card">
+                <h3>Total Users</h3>
+                <p>${usersCountRes.rows[0].count}</p>
+            </div>
+            <div class="card">
+                <h3>Active Users</h3>
+                <p>${activeSubsRes.rows[0].count}</p>
+            </div>
+            <div class="card">
+                <h3>Total Site Visits</h3>
+                <p>${totalVisitsRes.rows[0].count}</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>`);
   } catch (err) {
+    console.error('Analytics Error:', err.message);
     res.status(500).send('Error loading analytics.');
   }
 });
