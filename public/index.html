@@ -814,7 +814,12 @@
     window.onload = async () => {
       const urlParams = new URLSearchParams(window.location.search);
       const paymentStatus = urlParams.get('payment');
+      const newKey = urlParams.get('new_key');
+      
       if (paymentStatus === 'success') {
+        if (newKey) {
+          localStorage.setItem('cloudgrip_key', newKey);
+        }
         alert('Payment successful via Paystack! Your subscription has been activated.');
         window.history.replaceState({}, document.title, window.location.pathname);
       } else if (paymentStatus === 'failed') {
@@ -823,8 +828,9 @@
       }
 
       const savedKey = localStorage.getItem('cloudgrip_key');
-      if (savedKey) {
-        await loadDashboard(savedKey);
+      const savedEmail = localStorage.getItem('cloudgrip_email');
+      if (savedKey || savedEmail) {
+        await loadDashboard(savedKey, savedEmail);
       }
     };
 
@@ -900,10 +906,13 @@
         });
         const data = await res.json();
         if(data.success) {
-          localStorage.setItem('cloudgrip_key', data.apiKey);
-          await loadDashboard(data.apiKey);
+          if (data.apiKey) localStorage.setItem('cloudgrip_key', data.apiKey);
+          localStorage.setItem('cloudgrip_email', email);
+          await loadDashboard(data.apiKey, email);
         } else if(data.requiresPayment) {
+          localStorage.setItem('cloudgrip_email', email);
           showError('Device security check: An account has already been registered from this device. Please submit a subscription payment to complete creation.');
+          openSubModal();
         } else {
           showError(data.error || 'Registration failed.');
         }
@@ -927,8 +936,9 @@
         });
         const data = await res.json();
         if(data.success) {
-          localStorage.setItem('cloudgrip_key', data.apiKey);
-          await loadDashboard(data.apiKey);
+          if (data.apiKey) localStorage.setItem('cloudgrip_key', data.apiKey);
+          localStorage.setItem('cloudgrip_email', email);
+          await loadDashboard(data.apiKey, email);
         } else {
           showError(data.error || 'Invalid email or password.');
         }
@@ -959,24 +969,34 @@
       }
     }
 
-    async function loadDashboard(key) {
+    async function loadDashboard(key, email) {
       document.getElementById('auth-container').classList.add('hidden');
       document.getElementById('dashboard').classList.remove('hidden');
-      document.getElementById('res-key').innerText = key || 'API Key Revoked';
+      document.getElementById('res-key').innerText = key || 'API Key Revoked (Pending Renewal)';
 
       try {
-        const res = await fetch('/client/stats', {
-          headers: { 'x-cloudgrip-key': key }
-        });
+        let url = '/client/stats';
+        const headers = {};
+        if (key) {
+          headers['x-cloudgrip-key'] = key;
+        } else if (email) {
+          url += '?email=' + encodeURIComponent(email);
+        }
+
+        const res = await fetch(url, { headers });
         const data = await res.json();
+        
         if(data.success) {
-          document.getElementById('stat-spend').innerText = '$' + data.currentSpendUSD.toFixed(4);
-          document.getElementById('stat-expiry').innerText = new Date(data.trialExpiresAt).toLocaleDateString();
+          if (data.email) localStorage.setItem('cloudgrip_email', data.email);
+          if (data.client_key) localStorage.setItem('cloudgrip_key', data.client_key);
+
+          document.getElementById('stat-spend').innerText = '$' + (data.currentSpendUSD || 0).toFixed(4);
+          document.getElementById('stat-expiry').innerText = data.trialExpiresAt ? new Date(data.trialExpiresAt).toLocaleDateString() : 'Expired';
 
           const statusEl = document.getElementById('stat-status');
           const now = new Date();
-          const trialExpiry = new Date(data.trialExpiresAt);
-          const isFreeOrExpired = data.status === 'expired' || now > trialExpiry;
+          const trialExpiry = data.trialExpiresAt ? new Date(data.trialExpiresAt) : new Date(0);
+          const isFreeOrExpired = data.status === 'expired' || now > trialExpiry || !key;
 
           if(isFreeOrExpired) {
             statusEl.innerText = 'Expired / Unpaid';
@@ -999,9 +1019,10 @@
           if(data.logs && data.logs.length > 0) {
             updateLogsTable(data.logs);
           }
-          initEventStream(key);
+          if (key) {
+            initEventStream(key);
+          }
         } else {
-          // Keep user on dashboard in expired/unpaid state instead of logging them out
           const statusEl = document.getElementById('stat-status');
           statusEl.innerText = 'Expired / Unpaid';
           statusEl.style.color = 'var(--error-text)';
@@ -1017,13 +1038,14 @@
 
     async function updateBudget() {
       const key = localStorage.getItem('cloudgrip_key');
+      const email = localStorage.getItem('cloudgrip_email');
       const fixedAmount = 20.00;
 
       try {
         const res = await fetch('/api/topup/initialize', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-cloudgrip-key': key },
-          body: JSON.stringify({ amount: fixedAmount })
+          headers: { 'Content-Type': 'application/json', 'x-cloudgrip-key': key || '' },
+          body: JSON.stringify({ amount: fixedAmount, email: email })
         });
         const data = await res.json();
         if(data.status && data.authorization_url) {
@@ -1092,6 +1114,7 @@
     function logout() {
       if(eventSource) eventSource.close();
       localStorage.removeItem('cloudgrip_key');
+      localStorage.removeItem('cloudgrip_email');
       location.reload();
     }
   </script>
