@@ -11,7 +11,8 @@ import fs from 'fs';
 import path from 'path';
 import axios from 'axios';
 import { fileURLToPath } from 'url';
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -193,21 +194,24 @@ app.post('/client/budget-cap', async (req, res) => {
   res.json({ success: true, message: 'Budget cap updated.' });
 });
 
-// Helper function to send email with automatic console fallback
 async function sendOtpEmail(email, otpCode) {
   try {
-    await transporter.sendMail({
-      from: '"CloudGrip Security" <no-reply@cloudgrip.ai>',
-      to: email,
+    await resend.emails.send({
+      from: 'CloudGrip Security <onboarding@resend.dev>',
+      to: [email],
       subject: 'Your CloudGrip Verification Code',
-      text: `Your 6-digit verification code is: ${otpCode}. It expires in 10 minutes.`
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #000; color: #fff; padding: 40px; border-radius: 12px; max-width: 480px; margin: auto; border: 1px solid #27272a;">
+          <h2 style="font-size: 18px; font-weight: 600; margin-bottom: 12px; color: #fff;">CloudGrip Security</h2>
+          <p style="font-size: 13.5px; color: #a1a1aa; margin-bottom: 24px;">Enter the secure 6-digit verification code below to verify your account and activate your gateway access.</p>
+          <div style="background: #09090b; border: 1px solid #27272a; padding: 16px; border-radius: 8px; text-align: center; font-size: 32px; font-weight: 700; letter-spacing: 8px; color: #10b981; font-family: monospace; margin-bottom: 24px;">${otpCode}</div>
+          <p style="font-size: 11.5px; color: #71717a; line-height: 1.4;">This code expires in 10 minutes. If you did not request this verification, please disregard this email.</p>
+        </div>
+      `
     });
-    console.log(`[CloudGrip Email] OTP successfully sent to ${email}`);
+    console.log(`[CloudGrip Resend] OTP successfully dispatched to ${email}`);
   } catch (emailErr) {
-    console.error(`[CloudGrip SMTP Fallback] Email dispatch failed: ${emailErr.message}`);
-    console.log(`========================================`);
-    console.log(`[FALLBACK OTP CODE FOR ${email}]: ${otpCode}`);
-    console.log(`========================================`);
+    console.error(`[Resend API Error]: ${emailErr.message}`);
   }
 }
 

@@ -30,6 +30,7 @@
     "express-session": "^1.19.0",
     "http-proxy-middleware": "^4.2.0",
     "nodemailer": "^10.0.10",
-    "pg": "^8.23.0"
+    "pg": "^8.23.0",
+    "resend": "^6.28.1"
   }
 }
