@@ -298,7 +298,7 @@ app.get('/analytics', requireAdmin, async (req, res) => {
                             <td>#${client.id}</td>
                             <td>${client.email}</td>
                             <td style="font-family: monospace; color: #94a3b8;">${client.client_key ? client.client_key.substring(0, 10) + '...' : 'None'}</td>
-                            <td>$${parseFloat(client.current_spend_usd \vert{}\vert{} 0).toFixed(2)} /$${parseFloat(client.budget_cap_usd || 15).toFixed(2)}</td>
+                            <td>$${parseFloat(client.current_spend_usd || 0).toFixed(2)} / $${parseFloat(client.budget_cap_usd || 15).toFixed(2)}</td>
                             <td><span class="badge ${client.status === 'active' ? 'badge-active' : 'badge-pending'}">${client.status}</span></td>
                             <td>${client.is_verified ? '✅ Yes' : '⏳ Pending'}</td>
                         </tr>
