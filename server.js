@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
+import session from 'express-session';
 import { Readable } from 'stream';
 import EventEmitter from 'events';
 import pkg from 'pg';
@@ -29,6 +30,22 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Setup session support for admin authentication
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'cloudgrip-secure-admin-secret-key',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { secure: false }
+}));
+
+// Simple admin authentication middleware
+function requireAdmin(req, res, next) {
+  if (req.session && req.session.isAdmin) {
+    return next();
+  }
+  res.redirect('/admin/login');
+}
+
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
@@ -39,6 +56,161 @@ app.get('/terms', (req, res) => {
 
 app.get('/privacy', (req, res) => {
   res.send(`<!DOCTYPE html><html><head><title>Privacy - CloudGrip AI</title><style>body{font-family:Inter,sans-serif;background:#090a0f;color:#f3f4f6;padding:60px 24px;max-width:700px;margin:auto;line-height:1.6}h1{font-size:24px;color:#fff;margin-bottom:16px}p{font-size:14px;color:#9ca3af}</style></head><body><h1>Privacy Policy</h1><p>We protect your credential integrity and process telemetry traffic with maximum security protocols.</p></body></html>`);
+});
+
+// Admin Login View
+app.get('/admin/login', (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <title>CloudGrip Admin Login</title>
+      <style>
+        body { background: #0b0f19; color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; height: 100vh; align-items: center; justify-content: center; margin: 0; }
+        .login-card { background: #131b2e; border: 1px solid #1e293b; padding: 40px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); width: 300px; }
+        h2 { margin-top: 0; margin-bottom: 20px; font-size: 20px; color: #fff; text-align: center; }
+        input { width: 100%; box-sizing: border-box; padding: 12px; margin-bottom: 15px; background: #0b0f19; border: 1px solid #334155; color: #fff; border-radius: 4px; font-size: 14px; }
+        button { width: 100%; padding: 12px; background: #10b981; border: none; color: #fff; font-weight: bold; border-radius: 4px; cursor: pointer; font-size: 14px; }
+        button:hover { background: #059669; }
+      </style>
+    </head>
+    <body>
+      <div class="login-card">
+        <h2>🛡️ CloudGrip Admin</h2>
+        <form action="/admin/login" method="POST">
+          <input type="password" name="password" placeholder="Enter admin password" required autofocus />
+          <button type="submit">Login</button>
+        </form>
+      </div>
+    </body>
+    </html>
+  `);
+});
+
+// Handle Login Form Submission
+app.post('/admin/login', express.urlencoded({ extended: true }), (req, res) => {
+  if (req.body.password === 'admin123') {
+    req.session.isAdmin = true;
+    return res.redirect('/analytics');
+  }
+  res.send('<script>alert("Wrong password!"); window.location.href="/admin/login";</script>');
+});
+
+// Logout Route
+app.get('/admin/logout', (req, res) => {
+  req.session.destroy(() => {
+    res.redirect('/admin/login');
+  });
+});
+
+// Protected Custom Analytics Dashboard Route
+app.get('/analytics', requireAdmin, async (req, res) => {
+  try {
+    const usersCountRes = await pool.query('SELECT COUNT(*) FROM clients');
+    const activeSubsRes = await pool.query("SELECT COUNT(*) FROM clients WHERE status = 'active'");
+    const totalRevenueRes = await pool.query('SELECT SUM(current_spend_usd) FROM clients');
+    const totalRequestsRes = await pool.query('SELECT COUNT(*) FROM request_logs');
+    
+    const chartDataRes = await pool.query(`
+      SELECT TO_CHAR(timestamp, 'Dy') as day, COUNT(*) as count 
+      FROM request_logs 
+      WHERE timestamp >= NOW() - INTERVAL '7 days' 
+      GROUP BY TO_CHAR(timestamp, 'Dy'), DATE(timestamp) 
+      ORDER BY DATE(timestamp) ASC
+    `);
+
+    const totalUsers = parseInt(usersCountRes.rows[0]?.count || 0);
+    const activeSubs = parseInt(activeSubsRes.rows[0]?.count || 0);
+    const totalRevenue = parseFloat(totalRevenueRes.rows[0]?.sum || 0).toFixed(2);
+    const proxyRequests = parseInt(totalRequestsRes.rows[0]?.count || 0);
+
+    const chartLabels = chartDataRes.rows.map(r => r.day);
+    const chartValues = chartDataRes.rows.map(r => parseInt(r.count));
+
+    res.send(`
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <title>CloudGrip Analytics</title>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <style>
+          body { background: #0b0f19; color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 30px; }
+          .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e293b; padding-bottom: 15px; margin-bottom: 25px; }
+          .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 30px; }
+          .card { background: #131b2e; border: 1px solid #1e293b; border-radius: 8px; padding: 20px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+          .card h3 { margin: 0 0 10px 0; font-size: 14px; color: #94a3b8; font-weight: 500; }
+          .card .value { font-size: 28px; font-weight: 700; color: #fff; }
+          .card .subtext { font-size: 12px; color: #10b981; margin-top: 5px; }
+          .chart-container { background: #131b2e; border: 1px solid #1e293b; border-radius: 8px; padding: 20px; }
+          a.logout { color: #ef4444; text-decoration: none; font-size: 14px; padding: 6px 12px; background: rgba(239, 68, 68, 0.1); border-radius: 4px; }
+          a.logout:hover { background: rgba(239, 68, 68, 0.2); }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1 style="font-size: 20px; margin: 0; display:flex; align-items:center; gap:10px;">🛡️ CloudGrip Analytics</h1>
+          <a href="/admin/logout" class="logout">Logout</a>
+        </div>
+
+        <div class="grid">
+          <div class="card" style="border-left: 4px solid #10b981;">
+            <h3>Revenue</h3>
+            <div class="value">$${totalRevenue}</div>
+            <div class="subtext">Live database aggregation</div>
+          </div>
+          <div class="card">
+            <h3>Active Subs</h3>
+            <div class="value">${activeSubs}</div>
+          </div>
+          <div class="card">
+            <h3>Total Users</h3>
+            <div class="value">${totalUsers}</div>
+          </div>
+          <div class="card">
+            <h3>Proxy Requests</h3>
+            <div class="value">${proxyRequests}</div>
+          </div>
+        </div>
+
+        <div class="chart-container">
+          <h3 style="margin-top: 0; color: #94a3b8; font-size: 14px;">Proxy Request Volume (Last 7 Days)</h3>
+          <canvas id="trafficChart" height="80"></canvas>
+        </div>
+
+        <script>
+          const ctx = document.getElementById('trafficChart').getContext('2d');
+          new Chart(ctx, {
+            type: 'line',
+            data: {
+              labels: ${JSON.stringify(chartLabels.length ? chartLabels : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'])},
+              datasets: [{
+                label: 'Requests',
+                data: ${JSON.stringify(chartValues.length ? chartValues : [0, 0, 0, 0, 0, 0, 0])},
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                fill: true,
+                tension: 0.4
+              }]
+            },
+            options: {
+              responsive: true,
+              plugins: { legend: { display: false } },
+              scales: {
+                x: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8' } },
+                y: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8' } }
+              }
+            }
+          });
+        </script>
+      </body>
+      </html>
+    `);
+  } catch (err) {
+    console.error('Analytics Route Error:', err);
+    res.status(500).send('Error loading analytics data.');
+  }
 });
 
 app.post('/forgot-password', async (req, res) => {
@@ -296,7 +468,7 @@ app.post('/login', async (req, res) => {
 
 // Middleware for proxy traffic only with hard budget cap circuit breaker enforcement
 app.use(async (req, res, next) => {
-  if (['/events', '/register', '/login', '/', '/terms', '/privacy', '/client/stats', '/client/budget-cap', '/forgot-password'].includes(req.path) || req.path.startsWith('/api/topup/')) return next();
+  if (['/events', '/register', '/login', '/', '/terms', '/privacy', '/client/stats', '/client/budget-cap', '/forgot-password', '/admin/login', '/analytics'].includes(req.path) || req.path.startsWith('/api/topup/')) return next();
   if (req.path.startsWith('/css/') || req.path.startsWith('/js/') || req.path.startsWith('/images/')) return next();
 
   const clientKey = req.headers['x-cloudgrip-key'] || req.query.cloudgrip_key;
@@ -323,7 +495,7 @@ app.use(async (req, res, next) => {
 });
 
 app.all(/.*/, async (req, res) => {
-  if (['/', '/register', '/login', '/events', '/terms', '/privacy', '/client/stats', '/client/budget-cap', '/forgot-password'].includes(req.path) || req.path.startsWith('/api/topup/')) return;
+  if (['/', '/register', '/login', '/events', '/terms', '/privacy', '/client/stats', '/client/budget-cap', '/forgot-password', '/admin/login', '/analytics'].includes(req.path) || req.path.startsWith('/api/topup/')) return;
 
   let statusCode = 502;
   let cost = 0.01;
