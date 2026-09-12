@@ -45,13 +45,18 @@ function requireAdmin(req, res, next) {
   res.redirect('/admin/login');
 }
 
-// Track Website Visits Middleware for Homepage (placed BEFORE static files)
+// Track Website Visits Middleware for Homepage (ignoring browser prefetch/prerender requests)
 app.use(async (req, res, next) => {
   if (req.path === '/' && req.method === 'GET') {
-    try {
-      await pool.query('INSERT INTO site_visits (visited_at) VALUES (NOW())');
-    } catch (err) {
-      console.error('Error logging site visit:', err.message);
+    const purpose = req.headers['purpose'] || req.headers['sec-purpose'] || req.headers['x-moz'];
+    const isPrefetch = purpose && (purpose.includes('prefetch') || purpose.includes('prerender'));
+
+    if (!isPrefetch) {
+      try {
+        await pool.query('INSERT INTO site_visits (visited_at) VALUES (NOW())');
+      } catch (err) {
+        console.error('Error logging site visit:', err.message);
+      }
     }
   }
   next();
@@ -190,7 +195,7 @@ app.get('/analytics', requireAdmin, async (req, res) => {
       </head>
       <body>
         <div class="header">
-          <h1 style="font-size: 20px; margin: 0; display:flex; align-items:center; gap:10px;">CloudGrip Analytics & Management</h1>
+          <h1 style="font-size: 20px; margin: 0;">CloudGrip Analytics & Management</h1>
           <a href="/admin/logout" class="logout">Logout</a>
         </div>
 
@@ -198,7 +203,7 @@ app.get('/analytics', requireAdmin, async (req, res) => {
           <div class="card" style="border-left: 4px solid #10b981;">
             <h3>Revenue</h3>
             <div class="value">$${totalRevenue}</div>
-            <div class="subtext">$20.00 × Active Subs</div>
+            <div class="subtext">$20.00 x Active Subs</div>
           </div>
           <div class="card">
             <h3>Active Subs</h3>
@@ -284,7 +289,7 @@ app.post('/forgot-password', async (req, res) => {
   res.json({ success: true, message: 'Password recovery instructions sent to your email.' });
 });
 
-// Client Stats & Expiry Check
+// Client Stats & Expiry Check (Keeps API key intact, marks expired status, provides notice)
 app.get('/client/stats', async (req, res) => {
   let clientKey = req.headers['x-cloudgrip-key'] || req.query.cloudgrip_key;
   if (!clientKey || clientKey === 'null' || clientKey === 'undefined') clientKey = null;
@@ -307,9 +312,10 @@ app.get('/client/stats', async (req, res) => {
   const trialExpiry = new Date(client.trial_expires_at);
   let status = client.status;
 
-  if (now > trialExpiry && client.current_spend_usd >= (client.budget_cap_usd || 20.00)) {
+  // If expired, update status to 'expired' WITHOUT deleting or nullifying the client_key
+  if (now > trialExpiry && status === 'active') {
     status = 'expired';
-    await pool.query("UPDATE clients SET status = 'expired', client_key = NULL WHERE id = $1", [client.id]);
+    await pool.query("UPDATE clients SET status = 'expired' WHERE id = $1", [client.id]);
   }
 
   const logsResult = await pool.query('SELECT * FROM request_logs WHERE client_key = $1 ORDER BY id DESC LIMIT 10', [client.client_key || 'none']);
@@ -321,7 +327,8 @@ app.get('/client/stats', async (req, res) => {
     trialExpiresAt: client.trial_expires_at,
     status: status,
     email: client.email,
-    client_key: client.client_key,
+    client_key: client.client_key, // Preserved even if expired
+    notice: status === 'expired' ? 'Your API gateway access has been paused until you resubscribe.' : null,
     logs: logsResult.rows
   });
 });
@@ -407,7 +414,7 @@ app.post('/api/topup/initialize', async (req, res) => {
   }
 });
 
-// Verify Payment & Generate FRESH New API Key
+// Verify Payment & Reactivate Subscription (Keeps existing API key, resets spend, renews expiry)
 app.get('/api/topup/verify', async (req, res) => {
   const { reference, email, amount } = req.query;
   if (!reference || !email) {
@@ -424,15 +431,18 @@ app.get('/api/topup/verify', async (req, res) => {
     if (txData && txData.status && txData.data.status === 'success') {
       const clientRes = await pool.query('SELECT * FROM clients WHERE email = $1', [email]);
       if (clientRes.rows.length > 0) {
-        const newClientKey = `cg-${crypto.randomBytes(16).toString('hex')}`;
+        const client = clientRes.rows[0];
+        // If they somehow don't have a key yet (pending account), generate one. Otherwise, keep their existing key!
+        const existingKey = client.client_key;
+        const activeClientKey = existingKey && existingKey !== 'null' ? existingKey : `cg-${crypto.randomBytes(16).toString('hex')}`;
         const newExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
         await pool.query(
           'UPDATE clients SET client_key = $1, current_spend_usd = 0.00, trial_expires_at = $2, status = $3 WHERE email = $4',
-          [newClientKey, newExpiry, 'active', email]
+          [activeClientKey, newExpiry, 'active', email]
         );
 
-        return res.redirect(`/?payment=success&new_key=${newClientKey}`);
+        return res.redirect(`/?payment=success&new_key=${activeClientKey}`);
       }
     }
     return res.redirect('/?payment=failed');
@@ -502,7 +512,7 @@ app.post('/register', async (req, res) => {
 
     res.json({ 
       success: true, 
-      apiKey: clientKey, 
+      apiKey: clientKey, // Will be null for non-trial/returning device users as requested
       email: email,
       requiresPayment: !isNewDevice,
       message: isNewDevice ? '7-day trial activated!' : 'Account created. Please complete subscription payment to generate your API key.'
@@ -528,7 +538,7 @@ app.post('/login', async (req, res) => {
   });
 });
 
-// Middleware for proxy traffic only with hard budget cap circuit breaker enforcement
+// Middleware for proxy traffic strictly enforcing expired subscription pauses & budget caps
 app.use(async (req, res, next) => {
   if (['/events', '/register', '/login', '/', '/terms', '/privacy', '/client/stats', '/client/budget-cap', '/forgot-password', '/admin/login', '/analytics', '/admin/reset-spend'].includes(req.path) || req.path.startsWith('/api/topup/')) return next();
   if (req.path.startsWith('/css/') || req.path.startsWith('/js/') || req.path.startsWith('/images/')) return next();
@@ -543,13 +553,18 @@ app.use(async (req, res, next) => {
   const now = new Date();
   const trialExpiry = new Date(clientConfig.trial_expires_at);
 
+  // Check if subscription status is expired or time has elapsed
+  if (clientConfig.status === 'expired' || now > trialExpiry) {
+    // Ensure status is marked expired in DB if not already
+    if (clientConfig.status !== 'expired') {
+      await pool.query("UPDATE clients SET status = 'expired' WHERE id = $1", [clientConfig.id]);
+    }
+    return res.status(402).json({ error: 'Payment Required: Your API gateway access has been paused due to an expired subscription. Please resubscribe to reactivate.' });
+  }
+
   // Hard Budget Cap Circuit Breaker Check
   if (clientConfig.current_spend_usd >= (clientConfig.budget_cap_usd || 20.00)) {
     return res.status(402).json({ error: 'Circuit Breaker Triggered: Maximum budget cap reached. Please top up or increase your cap.' });
-  }
-
-  if (now > trialExpiry) {
-    return res.status(402).json({ error: 'Payment Required: Subscription expired.' });
   }
 
   req.clientConfig = clientConfig;
