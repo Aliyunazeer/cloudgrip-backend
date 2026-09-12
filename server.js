@@ -27,13 +27,16 @@ const pool = new Pool({
   family: 4
 });
 
-// Configure Nodemailer Email Transporter
+// Configure Nodemailer Email Transporter (Forced to IPv4 for Render cloud compatibility)
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
-  }
+  },
+  socketTimeout: 10000,
+  connectionTimeout: 10000,
+  family: 4 // <-- THIS LINE FORCES IPV4 AND FIXES ENETUNREACH ON RENDER
 });
 
 app.use(express.json({ limit: '10mb' }));
