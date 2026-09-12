@@ -258,7 +258,7 @@
       padding: 28px;
     }
 
-    /* HOVER-EXPANDING SIDEBAR DASHBOARD LAYOUT */
+    /* HOVER-EXPANDING SIDEBAR WITH HAMBURGER ICON */
     .dashboard-layout {
       display: flex;
       min-height: calc(100vh - 60px);
@@ -269,10 +269,10 @@
       width: 64px;
       background: var(--card-bg);
       border-right: 1px solid var(--border);
-      padding: 24px 12px;
+      padding: 20px 12px;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 6px;
       overflow: hidden;
       transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1);
       white-space: nowrap;
@@ -283,11 +283,28 @@
       width: 220px;
     }
 
+    .hamburger-icon-container {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 10px 10px 20px 10px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 10px;
+      color: var(--text);
+    }
+    
+    .hamburger-svg {
+      width: 20px;
+      height: 20px;
+      min-width: 20px;
+      fill: currentColor;
+    }
+
     .sidebar-item {
       display: flex;
       align-items: center;
       gap: 16px;
-      padding: 10px 12px;
+      padding: 10px 10px;
       font-size: 13px;
       font-weight: 500;
       color: var(--text-muted);
@@ -299,15 +316,13 @@
     .sidebar-item:hover { background: var(--card-hover); color: #fff; }
     .sidebar-item.active { background: #18181b; color: #fff; font-weight: 600; border: 1px solid var(--border); }
     
-    .sidebar-icon {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 13px;
-      font-weight: 600;
-      width: 16px;
-      text-align: center;
-      color: var(--text-dim);
+    .sidebar-label {
+      opacity: 0;
+      transition: opacity 0.15s ease-in-out;
     }
-    .sidebar-item:hover .sidebar-icon, .sidebar-item.active .sidebar-icon { color: #fff; }
+    .sidebar:hover .sidebar-label {
+      opacity: 1;
+    }
 
     .dashboard-main {
       flex: 1;
@@ -431,7 +446,7 @@
     <div class="nav-links">
       <a href="#features" onclick="showLandingView()">Features</a>
       <a href="#pricing" onclick="showLandingView()">Pricing</a>
-      <a href="https://github.com" target="_blank">GitHub</a>
+      <a href="https://github.com/aliyunazeer07/cloudgrip-proxy" target="_blank">GitHub</a>
       <a href="#" onclick="showAuthView('login'); return false;" id="nav-auth-link">Sign In</a>
     </div>
   </nav>
@@ -568,38 +583,43 @@
     </div>
   </div>
 
-  <!-- DASHBOARD VIEW WITH HOVER-EXPANDING SIDEBAR & MULTI-TABS -->
+  <!-- DASHBOARD VIEW WITH HOVER-EXPANDING SIDEBAR & TIER RESTRICTION -->
   <div id="dashboard-view" class="dashboard-layout hidden">
-    <!-- Hover Expanding Sidebar -->
+    <!-- Hover Expanding Sidebar with Vector Hamburger Icon -->
     <div class="sidebar" id="app-sidebar">
+      <div class="hamburger-icon-container">
+        <svg class="hamburger-svg" viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+        <span class="sidebar-label" style="font-weight: 600; font-size: 12px; letter-spacing: 0.5px;">MENU</span>
+      </div>
+      
       <a class="sidebar-item active" onclick="switchDashboardTab('overview', this)">
-        <span class="sidebar-icon">01</span>
-        <span>Overview</span>
+        <svg class="hamburger-svg" viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+        <span class="sidebar-label">Overview</span>
       </a>
-      <a class="sidebar-item" onclick="switchDashboardTab('keys', this)">
-        <span class="sidebar-icon">02</span>
-        <span>API Key Vault</span>
+      <a class="sidebar-item paid-only-nav hidden" onclick="switchDashboardTab('keys', this)">
+        <svg class="hamburger-svg" viewBox="0 0 24 24"><path d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
+        <span class="sidebar-label">API Key Vault</span>
       </a>
-      <a class="sidebar-item" onclick="switchDashboardTab('budget', this)">
-        <span class="sidebar-icon">03</span>
-        <span>Hard-Cap Rules</span>
+      <a class="sidebar-item paid-only-nav hidden" onclick="switchDashboardTab('budget', this)">
+        <svg class="hamburger-svg" viewBox="0 0 24 24"><path d="M13 2.05v2.02c3.95.49 7 3.85 7 7.93 0 4.42-3.58 8-8 8s-8-3.58-8-8c0-4.08 3.05-7.44 7-7.93V2.05C5.83 2.58 2 6.84 2 12c0 5.52 4.48 10 10 10s10-4.48 10-10c0-5.16-3.83-9.42-9-10.95zM11 6h2v6h-2V6zm0 8h2v2h-2v-2z"/></svg>
+        <span class="sidebar-label">Hard-Cap Rules</span>
       </a>
-      <a class="sidebar-item" onclick="switchDashboardTab('teams', this)">
-        <span class="sidebar-icon">04</span>
-        <span>Team Governance</span>
+      <a class="sidebar-item paid-only-nav hidden" onclick="switchDashboardTab('teams', this)">
+        <svg class="hamburger-svg" viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+        <span class="sidebar-label">Team Governance</span>
       </a>
-      <a class="sidebar-item" onclick="switchDashboardTab('webhooks', this)">
-        <span class="sidebar-icon">05</span>
-        <span>Alert Webhooks</span>
+      <a class="sidebar-item paid-only-nav hidden" onclick="switchDashboardTab('webhooks', this)">
+        <svg class="hamburger-svg" viewBox="0 0 24 24"><path d="M20 17v-2c0-1.1-.9-2-2-2h-1V7c0-2.76-2.24-5-5-5S7 4.24 7 7v6H6c-1.1 0-2 .9-2 2v2h2v2h12v-2h2zm-9-10c0-1.66 1.34-3 3-3s3 1.34 3 3v6h-6V7z"/></svg>
+        <span class="sidebar-label">Alert Webhooks</span>
       </a>
       <a class="sidebar-item" onclick="switchDashboardTab('logs', this)">
-        <span class="sidebar-icon">06</span>
-        <span>Audit Logs</span>
+        <svg class="hamburger-svg" viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v-2zm-3-5V3.5L18.5 9H13z"/></svg>
+        <span class="sidebar-label">Audit Logs</span>
       </a>
       <div style="margin-top: auto;">
         <a class="sidebar-item" style="color: #f87171;" onclick="logout()">
-          <span class="sidebar-icon">x</span>
-          <span>Sign Out</span>
+          <svg class="hamburger-svg" viewBox="0 0 24 24" style="fill:#f87171"><path d="M10.09 15.59L11.5 17l5-5-5-5-1.41 1.41L12.67 11H3v2h9.67l-2.58 2.59zM19 3H5c-1.11 0-2 .9-2 2v4h2V5h14v14H5v-4H3v4c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg>
+          <span class="sidebar-label">Sign Out</span>
         </a>
       </div>
     </div>
@@ -612,6 +632,13 @@
           <p style="font-size: 12.5px; color: var(--text-muted);">Real-time gateway stream and account performance metrics.</p>
         </div>
         <button onclick="logout()" class="btn btn-outline" style="color: #f87171; border-color: rgba(239,68,68,0.3);">Sign Out</button>
+      </div>
+
+      <!-- FREE ACCOUNT UPGRADE BANNER (Appears for free/expired users on restricted tabs) -->
+      <div id="free-upgrade-banner" class="panel hidden" style="background: rgba(255, 255, 255, 0.03); border-color: var(--border);">
+        <h3 style="color: #fff; margin-bottom: 6px;">Team Tier Feature</h3>
+        <p>This advanced governance module is available exclusively on the CloudGrip Teams tier ($15/month).</p>
+        <button onclick="payWithPaystack()" class="btn btn-primary" style="margin-top: 8px;">Upgrade to Teams ($15/mo)</button>
       </div>
 
       <!-- TAB 1: OVERVIEW -->
@@ -652,7 +679,7 @@
         </div>
       </div>
 
-      <!-- TAB 2: API KEY VAULT -->
+      <!-- TAB 2: API KEY VAULT (Paid Only) -->
       <div id="tab-keys" class="dashboard-tab-content hidden">
         <div class="panel">
           <h3>Active Master Authentication Key</h3>
@@ -669,7 +696,7 @@
         </div>
       </div>
 
-      <!-- TAB 3: BUDGET RULES -->
+      <!-- TAB 3: BUDGET RULES (Paid Only) -->
       <div id="tab-budget" class="dashboard-tab-content hidden">
         <div class="panel">
           <h3>Gateway Hard Budget Cap Configuration</h3>
@@ -679,16 +706,9 @@
             <button onclick="updateBudgetCap()" class="btn btn-primary" style="width: 120px; margin:0;">Save Cap</button>
           </div>
         </div>
-        <div class="panel">
-          <h3>Circuit Breaker Action Mode</h3>
-          <p>Configure how CloudGrip responds when limits are breached.</p>
-          <div style="font-size: 13px; color: var(--text-muted); display:flex; align-items:center; gap:10px;">
-            <input type="checkbox" checked style="width:16px; height:16px;"> Return HTTP 402 Payment Required instantly
-          </div>
-        </div>
       </div>
 
-      <!-- TAB 4: TEAM GOVERNANCE -->
+      <!-- TAB 4: TEAM GOVERNANCE (Paid Only) -->
       <div id="tab-teams" class="dashboard-tab-content hidden">
         <div class="panel">
           <h3>Team Seat Management</h3>
@@ -700,7 +720,7 @@
         </div>
       </div>
 
-      <!-- TAB 5: ALERT WEBHOOKS -->
+      <!-- TAB 5: ALERT WEBHOOKS (Paid Only) -->
       <div id="tab-webhooks" class="dashboard-tab-content hidden">
         <div class="panel">
           <h3>Webhook Dispatcher</h3>
@@ -747,6 +767,7 @@
   <script>
     let isSignUpMode = false;
     let eventSource = null;
+    let isPaidTier = false;
 
     window.onload = async () => {
       const urlParams = new URLSearchParams(window.location.search);
@@ -880,15 +901,20 @@
           const trialExpiry = data.trialExpiresAt ? new Date(data.trialExpiresAt) : new Date(0);
           const isExpired = data.status === 'expired' || now > trialExpiry || !key;
 
-          if (isExpired) {
-            document.getElementById('stat-status').innerText = 'Expired / Unpaid';
-            document.getElementById('stat-status').style.color = '#f87171';
-            document.getElementById('sub-renewal-panel').classList.remove('hidden');
-          } else {
+          // Check if user has active paid/trial status
+          isPaidTier = !isExpired && data.status === 'active';
+
+          if (isPaidTier) {
             document.getElementById('stat-status').innerText = 'Active Pro Tier';
             document.getElementById('stat-status').style.color = 'var(--accent)';
             document.getElementById('sub-renewal-panel').classList.add('hidden');
+            document.querySelectorAll('.paid-only-nav').forEach(el => el.classList.remove('hidden'));
             initEventStream(key);
+          } else {
+            document.getElementById('stat-status').innerText = 'Free / Limited Tier';
+            document.getElementById('stat-status').style.color = '#f87171';
+            document.getElementById('sub-renewal-panel').classList.remove('hidden');
+            document.querySelectorAll('.paid-only-nav').forEach(el => el.classList.add('hidden'));
           }
 
           if (data.logs) updateLogsTable(data.logs);
@@ -899,6 +925,18 @@
     }
 
     function switchDashboardTab(tabName, el) {
+      // Restrict paid-only tabs if user is on free tier
+      const restrictedTabs = ['keys', 'budget', 'teams', 'webhooks'];
+      if (!isPaidTier && restrictedTabs.includes(tabName)) {
+        document.querySelectorAll('.dashboard-tab-content').forEach(el => el.classList.add('hidden'));
+        document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'));
+        el.classList.add('active');
+        document.getElementById('tab-heading').innerText = "Upgrade Required";
+        document.getElementById('free-upgrade-banner').classList.remove('hidden');
+        return;
+      }
+
+      document.getElementById('free-upgrade-banner').classList.add('hidden');
       document.querySelectorAll('.dashboard-tab-content').forEach(el => el.classList.add('hidden'));
       document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'));
       
