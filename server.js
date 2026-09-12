@@ -187,7 +187,7 @@ app.post('/client/budget-cap', async (req, res) => {
 async function sendOtpEmail(email, otpCode) {
   try {
     await resend.emails.send({
-      from: 'CloudGrip Security <onboarding@resend.dev>',
+      from: 'CloudGrip Security <noreply@cloudgrip.cloud-ip.cc>'
       to: [email],
       subject: 'Your CloudGrip Verification Code',
       html: `
