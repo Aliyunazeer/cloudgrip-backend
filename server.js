@@ -28,7 +28,6 @@ const pool = new Pool({
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-app.use(express.static(path.join(__dirname, 'public')));
 
 // Setup session support for admin authentication
 app.use(session({
@@ -46,7 +45,7 @@ function requireAdmin(req, res, next) {
   res.redirect('/admin/login');
 }
 
-// Track Website Visits Middleware for Homepage
+// Track Website Visits Middleware for Homepage (placed BEFORE static files)
 app.use(async (req, res, next) => {
   if (req.path === '/' && req.method === 'GET') {
     try {
@@ -57,6 +56,8 @@ app.use(async (req, res, next) => {
   }
   next();
 });
+
+app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -89,7 +90,7 @@ app.get('/admin/login', (req, res) => {
     </head>
     <body>
       <div class="login-card">
-        <h2>🛡️ CloudGrip Admin</h2>
+        <h2>CloudGrip Admin</h2>
         <form action="/admin/login" method="POST">
           <input type="password" name="password" placeholder="Enter admin password" required autofocus />
           <button type="submit">Login</button>
@@ -159,7 +160,7 @@ app.get('/analytics', requireAdmin, async (req, res) => {
         <td style="padding: 12px; border-bottom: 1px solid #1e293b; text-align: right;">
           <form action="/admin/reset-spend" method="POST" style="margin:0;">
             <input type="hidden" name="clientId" value="${c.id}" />
-            <button type="submit" style="padding: 6px 12px; background: #3b82f6; border: none; color: #fff; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 500;">🔄 Refresh Cap ($0)</button>
+            <button type="submit" style="padding: 6px 12px; background: #3b82f6; border: none; color: #fff; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 500;">Refresh Cap ($0)</button>
           </form>
         </td>
       </tr>
@@ -189,7 +190,7 @@ app.get('/analytics', requireAdmin, async (req, res) => {
       </head>
       <body>
         <div class="header">
-          <h1 style="font-size: 20px; margin: 0; display:flex; align-items:center; gap:10px;">🛡️ CloudGrip Analytics & Management</h1>
+          <h1 style="font-size: 20px; margin: 0; display:flex; align-items:center; gap:10px;">CloudGrip Analytics & Management</h1>
           <a href="/admin/logout" class="logout">Logout</a>
         </div>
 
