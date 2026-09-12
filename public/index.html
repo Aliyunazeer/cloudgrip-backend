@@ -673,8 +673,9 @@
 
       <!-- OTP VERIFICATION FORM SECTION -->
       <div id="otp-verify-section" class="hidden">
-        <div style="background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.2); padding: 12px; border-radius: var(--radius-sm); margin-bottom: 14px; font-size: 12px; color: var(--accent);">
-          Secure 6-digit code sent to <strong id="otp-sent-email"></strong>. Enter it below to verify your email.
+        <div style="background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.2); padding: 12px; border-radius: var(--radius-sm); margin-bottom: 14px; font-size: 12px; color: var(--accent); line-height: 1.5;">
+          Secure 6-digit code sent to <strong id="otp-sent-email"></strong>. Enter it below to verify your email.<br>
+          <span style="color: var(--text-muted); font-size: 11px;">(If you don't see it in your inbox within a minute, please check your spam folder).</span>
         </div>
         <div class="form-group">
           <label style="display:block; font-size:11px; color:var(--text-muted); margin-bottom:4px;">6-Digit OTP Code</label>
@@ -802,7 +803,7 @@
         <div class="panel">
           <h3>Team Seat Management</h3>
           <p>Manage shared engineering seats and administrative oversight permissions for your agency tier.</p>
-          <button onclick="alert('Seat invitation link copied.')" class="btn btn-outline">+ Invite Team Member</button>
+          <button onclick="copyInviteLink()" class="btn btn-outline">+ Invite Team Member</button>
         </div>
       </div>
 
@@ -1052,6 +1053,17 @@
       alert('API key copied to clipboard.');
     }
 
+    async function copyInviteLink() {
+      const inviteUrl = `${window.location.origin}/signup?ref=team-seat`;
+      try {
+        await navigator.clipboard.writeText(inviteUrl);
+        alert('Seat invitation link copied.');
+      } catch (err) {
+        console.error('Failed to copy invite link: ', err);
+        alert('Could not copy link automatically.');
+      }
+    }
+
     function logout() {
       if (eventSource) eventSource.close();
       localStorage.removeItem('cloudgrip_key');
@@ -1060,48 +1072,48 @@
     }
 
     document.getElementById('auth-submit-btn').addEventListener('click', async (e) => {
-  e.preventDefault();
-  hideMsg();
-  
-  const email = document.getElementById('auth-email').value.trim();
-  const password = document.getElementById('auth-pass').value;
-  
-  if (!email || !password) {
-    return showError('All fields are required.');
-  }
+      e.preventDefault();
+      hideMsg();
+      
+      const email = document.getElementById('auth-email').value.trim();
+      const password = document.getElementById('auth-pass').value;
+      
+      if (!email || !password) {
+        return showError('All fields are required.');
+      }
 
-  const endpoint = isSignUpMode ? '/register' : '/login';
-  const payload = isSignUpMode 
-    ? { email, password, fingerprint: navigator.userAgent + screen.width } 
-    : { email, password };
+      const endpoint = isSignUpMode ? '/register' : '/login';
+      const payload = isSignUpMode 
+        ? { email, password, fingerprint: navigator.userAgent + screen.width } 
+        : { email, password };
 
-  try {
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      try {
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+          if (data.apiKey) localStorage.setItem('cloudgrip_key', data.apiKey);
+          localStorage.setItem('cloudgrip_email', email);
+          await loadDashboard(data.apiKey, email);
+        } else if (data.requiresOtp) {
+          pendingVerificationEmail = data.email || email;
+          document.getElementById('otp-sent-email').innerText = pendingVerificationEmail;
+          document.getElementById('auth-form-fields').classList.add('hidden');
+          document.getElementById('otp-verify-section').classList.remove('hidden');
+          showSuccess(data.message || 'Verification code sent.');
+        } else {
+          showError(data.error || 'Authentication failed.');
+        }
+      } catch (err) {
+        console.error('Auth Error:', err);
+        showError('Network connectivity error.');
+      }
     });
-    
-    const data = await res.json();
-
-    if (res.ok && data.success) {
-      if (data.apiKey) localStorage.setItem('cloudgrip_key', data.apiKey);
-      localStorage.setItem('cloudgrip_email', email);
-      await loadDashboard(data.apiKey, email);
-    } else if (data.requiresOtp) {
-      pendingVerificationEmail = data.email || email;
-      document.getElementById('otp-sent-email').innerText = pendingVerificationEmail;
-      document.getElementById('auth-form-fields').classList.add('hidden');
-      document.getElementById('otp-verify-section').classList.remove('hidden');
-      showSuccess(data.message || 'Verification code sent.');
-    } else {
-      showError(data.error || 'Authentication failed.');
-    }
-  } catch (err) {
-    console.error('Auth Error:', err);
-    showError('Network connectivity error.');
-  }
-});
   </script>
 </body>
 </html>
