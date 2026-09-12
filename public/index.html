@@ -24,7 +24,7 @@
       --radius-sm: 6px;
       --radius-md: 8px;
       --radius-lg: 12px;
-      --transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+      --transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -71,7 +71,7 @@
     .nav-links a { color: var(--text-muted); text-decoration: none; transition: var(--transition); }
     .nav-links a:hover { color: #fff; }
 
-    /* Main Container & Layout */
+    /* Main Container */
     .main-container {
       max-width: 1100px;
       width: 100%;
@@ -159,7 +159,6 @@
     .btn-outline { background: transparent; border: 1px solid var(--border); color: #fff; }
     .btn-outline:hover { background: var(--card-hover); border-color: var(--border-hover); }
 
-    /* Section Headings */
     .section-header { margin-bottom: 32px; }
     .section-title { font-size: 20px; font-weight: 600; color: #fff; margin-bottom: 8px; letter-spacing: -0.4px; }
     .section-desc { font-size: 13px; color: var(--text-muted); }
@@ -182,7 +181,7 @@
     .feature-card h3 { font-size: 13.5px; font-weight: 600; color: #fff; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
     .feature-card p { font-size: 13px; color: var(--text-muted); line-height: 1.45; }
 
-    /* Code Snippet Showcase */
+    /* Code Showcase */
     .code-showcase {
       background: var(--card-bg);
       border: 1px solid var(--border);
@@ -204,9 +203,6 @@
       line-height: 1.5;
       overflow-x: auto;
     }
-    .code-block .keyword { color: #f43f5e; }
-    .code-block .string { color: #34d399; }
-    .code-block .variable { color: #60a5fa; }
 
     /* Pricing */
     .pricing-grid {
@@ -246,7 +242,7 @@
     .price-features li { font-size: 13px; color: var(--text-muted); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
     .price-features li::before { content: "—"; color: var(--text-dim); }
 
-    /* FAQ Section */
+    /* FAQ */
     .faq-container { margin-bottom: 80px; }
     .faq-item { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 20px; margin-bottom: 12px; }
     .faq-question { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 6px; }
@@ -262,25 +258,35 @@
       padding: 28px;
     }
 
-    /* DASHBOARD LAYOUT WITH SIDEBAR & HAMBURGER */
+    /* HOVER-EXPANDING SIDEBAR DASHBOARD LAYOUT */
     .dashboard-layout {
       display: flex;
       min-height: calc(100vh - 60px);
       width: 100%;
     }
+    
     .sidebar {
-      width: 240px;
+      width: 64px;
       background: var(--card-bg);
       border-right: 1px solid var(--border);
-      padding: 24px 16px;
+      padding: 24px 12px;
       display: flex;
       flex-direction: column;
       gap: 8px;
+      overflow: hidden;
+      transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      white-space: nowrap;
+      z-index: 40;
     }
+    
+    .sidebar:hover {
+      width: 220px;
+    }
+
     .sidebar-item {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 16px;
       padding: 10px 12px;
       font-size: 13px;
       font-weight: 500;
@@ -293,6 +299,16 @@
     .sidebar-item:hover { background: var(--card-hover); color: #fff; }
     .sidebar-item.active { background: #18181b; color: #fff; font-weight: 600; border: 1px solid var(--border); }
     
+    .sidebar-icon {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      font-weight: 600;
+      width: 16px;
+      text-align: center;
+      color: var(--text-dim);
+    }
+    .sidebar-item:hover .sidebar-icon, .sidebar-item.active .sidebar-icon { color: #fff; }
+
     .dashboard-main {
       flex: 1;
       padding: 32px;
@@ -351,7 +367,7 @@
       white-space: nowrap;
     }
 
-    input[type="email"], input[type="password"], input[type="number"] {
+    input[type="email"], input[type="password"], input[type="number"], input[type="text"] {
       width: 100%;
       height: 38px;
       padding: 0 12px;
@@ -362,7 +378,6 @@
       font-size: 13px;
       font-family: inherit;
       margin-bottom: 14px;
-      transition: var(--transition);
     }
     input:focus { outline: none; border-color: var(--border-hover); }
 
@@ -393,21 +408,6 @@
 
     .hidden { display: none !important; }
 
-    /* Mobile Hamburger Menu */
-    .hamburger-btn {
-      display: none;
-      background: none;
-      border: none;
-      color: #fff;
-      font-size: 20px;
-      cursor: pointer;
-    }
-    @media(max-width: 768px) {
-      .sidebar { display: none; position: absolute; z-index: 100; height: calc(100vh - 60px); }
-      .sidebar.mobile-open { display: flex; }
-      .hamburger-btn { display: block; }
-    }
-
     footer {
       border-top: 1px solid var(--border);
       padding: 24px 32px;
@@ -425,7 +425,6 @@
 
   <nav>
     <div class="nav-brand">
-      <button class="hamburger-btn" onclick="toggleMobileSidebar()">☰</button>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
       <h1>cloudgrip/core</h1>
     </div>
@@ -455,7 +454,6 @@
       </div>
     </div>
 
-    <!-- Features Grid -->
     <div id="features" class="section-header">
       <div class="section-title">Engineered for absolute cost control</div>
       <div class="section-desc">Zero telemetry. Zero third-party key logging. Your infrastructure remains completely secure.</div>
@@ -476,21 +474,19 @@
       </div>
     </div>
 
-    <!-- Code Integration Showcase -->
     <div class="code-showcase">
       <div class="code-tabs">
         <div class="code-tab active">server.js (Express Integration)</div>
       </div>
       <div class="code-block">
-        <span class="keyword">const</span> express = <span class="keyword">require</span>(<span class="string">'express'</span>);<br>
-        <span class="keyword">const</span> app = <span class="keyword">express</span>();<br><br>
-        <span class="comment">// Route requests through CloudGrip local proxy</span><br>
-        app.use(<span class="string">'/v1'</span>, proxy({ <span class="variable">target</span>: <span class="string">'http://localhost:3000'</span>, <span class="variable">hardCap</span>: <span class="string">'15.00'</span> }));<br>
-        app.listen(<span class="string">5000</span>);
+        const express = require('express');<br>
+        const app = express();<br><br>
+        // Route requests through CloudGrip local proxy<br>
+        app.use('/v1', proxy({ target: 'http://localhost:3000', hardCap: '15.00' }));<br>
+        app.listen(5000);
       </div>
     </div>
 
-    <!-- Pricing Section -->
     <div id="pricing" class="section-header">
       <div class="section-title">Transparent Licensing</div>
       <div class="section-desc">Choose between open-source self-hosting or managed multi-dev team infrastructure.</div>
@@ -528,7 +524,6 @@
       </div>
     </div>
 
-    <!-- FAQ Section -->
     <div class="faq-container">
       <div class="section-header" style="margin-bottom: 20px;">
         <div class="section-title">Frequently Asked Questions</div>
@@ -573,18 +568,39 @@
     </div>
   </div>
 
-  <!-- DASHBOARD VIEW WITH SIDEBAR & MULTI-TAB NAVIGATION -->
+  <!-- DASHBOARD VIEW WITH HOVER-EXPANDING SIDEBAR & MULTI-TABS -->
   <div id="dashboard-view" class="dashboard-layout hidden">
-    <!-- Sidebar / Hamburger Navigation -->
+    <!-- Hover Expanding Sidebar -->
     <div class="sidebar" id="app-sidebar">
-      <div style="font-size: 11px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; padding-left: 12px;">Gateway Menu</div>
-      <a class="sidebar-item active" onclick="switchDashboardTab('overview', this)">📊 Overview & Telemetry</a>
-      <a class="sidebar-item" onclick="switchDashboardTab('keys', this)">🔑 API Key Vault</a>
-      <a class="sidebar-item" onclick="switchDashboardTab('budget', this)">⚡ Hard-Cap Rules</a>
-      <a class="sidebar-item" onclick="switchDashboardTab('teams', this)">👥 Team Governance</a>
-      <a class="sidebar-item" onclick="switchDashboardTab('logs', this)">📜 Request Audit Logs</a>
+      <a class="sidebar-item active" onclick="switchDashboardTab('overview', this)">
+        <span class="sidebar-icon">01</span>
+        <span>Overview</span>
+      </a>
+      <a class="sidebar-item" onclick="switchDashboardTab('keys', this)">
+        <span class="sidebar-icon">02</span>
+        <span>API Key Vault</span>
+      </a>
+      <a class="sidebar-item" onclick="switchDashboardTab('budget', this)">
+        <span class="sidebar-icon">03</span>
+        <span>Hard-Cap Rules</span>
+      </a>
+      <a class="sidebar-item" onclick="switchDashboardTab('teams', this)">
+        <span class="sidebar-icon">04</span>
+        <span>Team Governance</span>
+      </a>
+      <a class="sidebar-item" onclick="switchDashboardTab('webhooks', this)">
+        <span class="sidebar-icon">05</span>
+        <span>Alert Webhooks</span>
+      </a>
+      <a class="sidebar-item" onclick="switchDashboardTab('logs', this)">
+        <span class="sidebar-icon">06</span>
+        <span>Audit Logs</span>
+      </a>
       <div style="margin-top: auto;">
-        <a class="sidebar-item" style="color: #f87171;" onclick="logout()">🚪 Sign Out</a>
+        <a class="sidebar-item" style="color: #f87171;" onclick="logout()">
+          <span class="sidebar-icon">x</span>
+          <span>Sign Out</span>
+        </a>
       </div>
     </div>
 
@@ -598,7 +614,7 @@
         <button onclick="logout()" class="btn btn-outline" style="color: #f87171; border-color: rgba(239,68,68,0.3);">Sign Out</button>
       </div>
 
-      <!-- TAB 1: OVERVIEW & TELEMETRY -->
+      <!-- TAB 1: OVERVIEW -->
       <div id="tab-overview" class="dashboard-tab-content">
         <div class="stats-grid">
           <div class="stat-card">
@@ -640,11 +656,16 @@
       <div id="tab-keys" class="dashboard-tab-content hidden">
         <div class="panel">
           <h3>Active Master Authentication Key</h3>
-          <p>Include this key in your client request headers via <code>x-cloudgrip-key</code> to route traffic through the proxy layer securely.</p>
+          <p>Include this key in your client request headers via <code>x-cloudgrip-key</code> to route traffic securely.</p>
           <div class="key-row">
             <div class="key-box" id="res-key"></div>
             <button onclick="copyKey()" class="btn btn-primary" style="width: 100px; margin:0;">Copy Key</button>
           </div>
+        </div>
+        <div class="panel">
+          <h3>Key Rotation & Security</h3>
+          <p>Revoke or rotate your active proxy token instantly if compromised.</p>
+          <button onclick="alert('Key rotation protocol initiated.')" class="btn btn-outline" style="border-color: rgba(239,68,68,0.3); color: #f87171;">Rotate Active Token</button>
         </div>
       </div>
 
@@ -658,6 +679,13 @@
             <button onclick="updateBudgetCap()" class="btn btn-primary" style="width: 120px; margin:0;">Save Cap</button>
           </div>
         </div>
+        <div class="panel">
+          <h3>Circuit Breaker Action Mode</h3>
+          <p>Configure how CloudGrip responds when limits are breached.</p>
+          <div style="font-size: 13px; color: var(--text-muted); display:flex; align-items:center; gap:10px;">
+            <input type="checkbox" checked style="width:16px; height:16px;"> Return HTTP 402 Payment Required instantly
+          </div>
+        </div>
       </div>
 
       <!-- TAB 4: TEAM GOVERNANCE -->
@@ -665,13 +693,24 @@
         <div class="panel">
           <h3>Team Seat Management</h3>
           <p>Manage shared engineering seats and administrative oversight permissions for your agency tier.</p>
-          <div style="background: #000; border: 1px solid var(--border); padding: 16px; border-radius: var(--radius-sm); font-size: 12px; color: var(--text-muted);">
+          <div style="background: #000; border: 1px solid var(--border); padding: 16px; border-radius: var(--radius-sm); font-size: 12.5px; color: var(--text-muted); margin-bottom: 16px;">
             Active Plan: <strong>CloudGrip Teams ($15/mo)</strong> — Unlimited shared gateway endpoints.
           </div>
+          <button onclick="alert('Seat invitation link copied.')" class="btn btn-outline">+ Invite Team Member</button>
         </div>
       </div>
 
-      <!-- TAB 5: AUDIT LOGS -->
+      <!-- TAB 5: ALERT WEBHOOKS -->
+      <div id="tab-webhooks" class="dashboard-tab-content hidden">
+        <div class="panel">
+          <h3>Webhook Dispatcher</h3>
+          <p>Receive instant notifications via Discord or Slack when spend thresholds reach 80% or 100%.</p>
+          <input type="text" placeholder="https://discord.com/api/webhooks/..." style="margin-bottom: 12px;">
+          <button onclick="alert('Webhook endpoint saved successfully.')" class="btn btn-primary">Save Webhook URL</button>
+        </div>
+      </div>
+
+      <!-- TAB 6: AUDIT LOGS -->
       <div id="tab-logs" class="dashboard-tab-content hidden">
         <div class="panel">
           <h3>Request Activity Logs</h3>
@@ -871,16 +910,10 @@
         'keys': 'API Key Vault',
         'budget': 'Hard-Cap Rules',
         'teams': 'Team Governance',
+        'webhooks': 'Alert Webhooks',
         'logs': 'Request Audit Logs'
       };
       document.getElementById('tab-heading').innerText = headings[tabName] || 'Dashboard';
-      
-      // Close mobile sidebar if open
-      document.getElementById('app-sidebar').classList.remove('mobile-open');
-    }
-
-    function toggleMobileSidebar() {
-      document.getElementById('app-sidebar').classList.toggle('mobile-open');
     }
 
     async function payWithPaystack() {

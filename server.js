@@ -68,12 +68,78 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// Ironclad Terms of Service Route (Liability & Warranty Protection)
 app.get('/terms', (req, res) => {
-  res.send(`<!DOCTYPE html><html><head><title>Terms - CloudGrip AI</title><style>body{font-family:Inter,sans-serif;background:#090a0f;color:#f3f4f6;padding:60px 24px;max-width:700px;margin:auto;line-height:1.6}h1{font-size:24px;color:#fff;margin-bottom:16px}p{font-size:14px;color:#9ca3af}</style></head><body><h1>Terms of Service</h1><p>Welcome to CloudGrip AI. You agree to utilize this gateway infrastructure lawfully and securely.</p></body></html>`);
+  res.send(`<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <title>Terms of Service — CloudGrip AI</title>
+  <style>
+    body { background: #000; color: #a1a1aa; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 60px 24px; max-width: 800px; margin: auto; line-height: 1.6; }
+    h1 { font-size: 24px; color: #fff; margin-bottom: 8px; font-weight: 600; }
+    h2 { font-size: 16px; color: #fff; margin-top: 32px; margin-bottom: 12px; font-weight: 600; }
+    p, li { font-size: 13.5px; margin-bottom: 12px; }
+    ul { padding-left: 20px; }
+    .update { font-size: 12px; color: #71717a; margin-bottom: 32px; font-family: monospace; }
+  </style>
+</head>
+<body>
+  <h1>Terms of Service</h1>
+  <div class="update">Last Updated: September 2026</div>
+  
+  <p>Please read these Terms of Service ("Terms") carefully before using the CloudGrip AI proxy gateway software and services. By accessing or using CloudGrip, you agree to be bound by these Terms.</p>
+
+  <h2>1. Software License & "As-Is" Disclaimer</h2>
+  <p>CloudGrip is provided on an "AS IS" and "AS AVAILABLE" basis, without warranties of any kind, either express or implied, including but not limited to warranties of merchantability, fitness for a particular purpose, or non-infringement. The authors and copyright holders shall not be liable for any claim, damages, or other liability arising from, out of, or in connection with the software or the use or other dealings in the software, including unexpected LLM API consumption charges.</p>
+
+  <h2>2. Limitation of Liability</h2>
+  <p>Under no circumstances shall CloudGrip, its creators, or affiliates be held liable for any indirect, incidental, special, consequential, or punitive damages, including loss of profits, data, use, goodwill, or other intangible losses resulting from (i) your access to or use of or inability to access or use the gateway; (ii) any unauthorized access to or alteration of your transmissions or API credentials.</p>
+
+  <h2>3. User Responsibilities & API Security</h2>
+  <p>You are solely responsible for maintaining the security of your local environment, database state, and master upstream API keys (OpenAI, Anthropic, Gemini). CloudGrip acts strictly as an intermediary interception layer and assumes no responsibility for compromised keys or runaway programmatic loops executed by third-party agents.</p>
+
+  <h2>4. Indemnification</h2>
+  <p>You agree to defend, indemnify, and hold harmless CloudGrip and its maintainers from and against any claims, liabilities, damages, losses, and expenses arising out of or in any way connected with your violation of these Terms or your use of the proxy service.</p>
+</body>
+</html>`);
 });
 
+// Ironclad Privacy Policy Route (Data Sovereignty & Compliance)
 app.get('/privacy', (req, res) => {
-  res.send(`<!DOCTYPE html><html><head><title>Privacy - CloudGrip AI</title><style>body{font-family:Inter,sans-serif;background:#090a0f;color:#f3f4f6;padding:60px 24px;max-width:700px;margin:auto;line-height:1.6}h1{font-size:24px;color:#fff;margin-bottom:16px}p{font-size:14px;color:#9ca3af}</style></head><body><h1>Privacy Policy</h1><p>We protect your credential integrity and process telemetry traffic with maximum security protocols.</p></body></html>`);
+  res.send(`<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <title>Privacy Policy — CloudGrip AI</title>
+  <style>
+    body { background: #000; color: #a1a1aa; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 60px 24px; max-width: 800px; margin: auto; line-height: 1.6; }
+    h1 { font-size: 24px; color: #fff; margin-bottom: 8px; font-weight: 600; }
+    h2 { font-size: 16px; color: #fff; margin-top: 32px; margin-bottom: 12px; font-weight: 600; }
+    p, li { font-size: 13.5px; margin-bottom: 12px; }
+    ul { padding-left: 20px; }
+    .update { font-size: 12px; color: #71717a; margin-bottom: 32px; font-family: monospace; }
+  </style>
+</head>
+<body>
+  <h1>Privacy Policy</h1>
+  <div class="update">Last Updated: September 2026</div>
+
+  <p>CloudGrip AI ("we", "our", or "us") is committed to protecting your privacy. This Privacy Policy outlines how your data is handled when you utilize our local proxy software and hosted team infrastructure.</p>
+
+  <h2>1. Zero Third-Party Telemetry & Data Sovereignty</h2>
+  <p>CloudGrip is engineered around local data sovereignty. All proxy traffic payload logs, cost calculations, and usage states are stored strictly within your local SQLite database or your private Supabase PostgreSQL instance. We do not inspect, log, store, or monetize your prompt contents or upstream LLM responses.</p>
+
+  <h2>2. Account Information</h2>
+  <p>When you register for a commercial team tier, we collect your work email address and encrypted password credentials strictly for authentication, license verification, and Paystack subscription management. We never share your email or billing details with third parties.</p>
+
+  <h2>3. Payment Processing Security</h2>
+  <p>All financial transactions and recurring subscription billings are processed securely through Paystack. CloudGrip servers never store raw credit card numbers, CVVs, or banking credentials.</p>
+
+  <h2>4. Changes to This Policy</h2>
+  <p>We reserve the right to modify this privacy policy at any time. Continued use of the software following any adjustments constitutes acceptance of those changes.</p>
+</body>
+</html>`);
 });
 
 // Admin Login View
