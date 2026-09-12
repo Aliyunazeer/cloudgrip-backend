@@ -827,7 +827,12 @@
         window.history.replaceState({}, document.title, window.location.pathname);
       }
 
-      const savedKey = localStorage.getItem('cloudgrip_key');
+      let savedKey = localStorage.getItem('cloudgrip_key');
+      if (!savedKey || savedKey === 'null' || savedKey === 'undefined') {
+        localStorage.removeItem('cloudgrip_key');
+        savedKey = null;
+      }
+
       const savedEmail = localStorage.getItem('cloudgrip_email');
       if (savedKey || savedEmail) {
         await loadDashboard(savedKey, savedEmail);
@@ -906,12 +911,17 @@
         });
         const data = await res.json();
         if(data.success) {
-          if (data.apiKey) localStorage.setItem('cloudgrip_key', data.apiKey);
+          if (data.apiKey) {
+            localStorage.setItem('cloudgrip_key', data.apiKey);
+          } else {
+            localStorage.removeItem('cloudgrip_key');
+          }
           localStorage.setItem('cloudgrip_email', email);
           await loadDashboard(data.apiKey, email);
         } else if(data.requiresPayment) {
           localStorage.setItem('cloudgrip_email', email);
-          showError('Device security check: An account has already been registered from this device. Please submit a subscription payment to complete creation.');
+          localStorage.removeItem('cloudgrip_key');
+          showError('Device security check: An account has already been registered from this device. Please submit subscription payment.');
           openSubModal();
         } else {
           showError(data.error || 'Registration failed.');
@@ -936,7 +946,11 @@
         });
         const data = await res.json();
         if(data.success) {
-          if (data.apiKey) localStorage.setItem('cloudgrip_key', data.apiKey);
+          if (data.apiKey && data.apiKey !== 'null') {
+            localStorage.setItem('cloudgrip_key', data.apiKey);
+          } else {
+            localStorage.removeItem('cloudgrip_key');
+          }
           localStorage.setItem('cloudgrip_email', email);
           await loadDashboard(data.apiKey, email);
         } else {
@@ -972,14 +986,19 @@
     async function loadDashboard(key, email) {
       document.getElementById('auth-container').classList.add('hidden');
       document.getElementById('dashboard').classList.remove('hidden');
-      document.getElementById('res-key').innerText = key || 'API Key Revoked (Pending Renewal)';
+      document.getElementById('res-key').innerText = key && key !== 'null' ? key : 'API Key Revoked (Renewal Required)';
 
       try {
         let url = '/client/stats';
         const headers = {};
-        if (key) {
+        
+        // Safely sanitize key
+        if (key && key !== 'null' && key !== 'undefined') {
           headers['x-cloudgrip-key'] = key;
-        } else if (email) {
+        } 
+        
+        // Always pass email query param as fallback if available
+        if (email) {
           url += '?email=' + encodeURIComponent(email);
         }
 
@@ -988,7 +1007,11 @@
         
         if(data.success) {
           if (data.email) localStorage.setItem('cloudgrip_email', data.email);
-          if (data.client_key) localStorage.setItem('cloudgrip_key', data.client_key);
+          if (data.client_key && data.client_key !== 'null') {
+            localStorage.setItem('cloudgrip_key', data.client_key);
+          } else {
+            localStorage.removeItem('cloudgrip_key');
+          }
 
           document.getElementById('stat-spend').innerText = '$' + (data.currentSpendUSD || 0).toFixed(4);
           document.getElementById('stat-expiry').innerText = data.trialExpiresAt ? new Date(data.trialExpiresAt).toLocaleDateString() : 'Expired';
@@ -996,7 +1019,7 @@
           const statusEl = document.getElementById('stat-status');
           const now = new Date();
           const trialExpiry = data.trialExpiresAt ? new Date(data.trialExpiresAt) : new Date(0);
-          const isFreeOrExpired = data.status === 'expired' || now > trialExpiry || !key;
+          const isFreeOrExpired = data.status === 'expired' || now > trialExpiry || !key || key === 'null';
 
           if(isFreeOrExpired) {
             statusEl.innerText = 'Expired / Unpaid';
@@ -1019,7 +1042,7 @@
           if(data.logs && data.logs.length > 0) {
             updateLogsTable(data.logs);
           }
-          if (key) {
+          if (key && key !== 'null' && key !== 'undefined') {
             initEventStream(key);
           }
         } else {
@@ -1037,14 +1060,15 @@
     }
 
     async function updateBudget() {
-      const key = localStorage.getItem('cloudgrip_key');
+      let key = localStorage.getItem('cloudgrip_key');
+      if (!key || key === 'null' || key === 'undefined') key = '';
       const email = localStorage.getItem('cloudgrip_email');
       const fixedAmount = 20.00;
 
       try {
         const res = await fetch('/api/topup/initialize', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-cloudgrip-key': key || '' },
+          headers: { 'Content-Type': 'application/json', ...(key ? { 'x-cloudgrip-key': key } : {}) },
           body: JSON.stringify({ amount: fixedAmount, email: email })
         });
         const data = await res.json();
