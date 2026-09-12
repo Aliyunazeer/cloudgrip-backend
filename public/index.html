@@ -962,7 +962,7 @@
     async function loadDashboard(key) {
       document.getElementById('auth-container').classList.add('hidden');
       document.getElementById('dashboard').classList.remove('hidden');
-      document.getElementById('res-key').innerText = key;
+      document.getElementById('res-key').innerText = key || 'API Key Revoked';
 
       try {
         const res = await fetch('/client/stats', {
@@ -982,7 +982,6 @@
             statusEl.innerText = 'Expired / Unpaid';
             statusEl.style.color = 'var(--error-text)';
             
-            // Show subscription options for expired/unpaid users
             document.getElementById('dashboard-sub-banner').classList.remove('hidden');
             document.getElementById('floating-upgrade-btn').classList.remove('hidden');
             document.getElementById('sub-action-panel').classList.remove('hidden');
@@ -991,7 +990,6 @@
             statusEl.innerText = 'Active Pro Tier';
             statusEl.style.color = 'var(--success-text)';
             
-            // HIDE all payment buttons and banners for active paid users!
             document.getElementById('dashboard-sub-banner').classList.add('hidden');
             document.getElementById('floating-upgrade-btn').classList.add('hidden');
             document.getElementById('sub-action-panel').classList.add('hidden');
@@ -1003,7 +1001,14 @@
           }
           initEventStream(key);
         } else {
-          logout();
+          // Keep user on dashboard in expired/unpaid state instead of logging them out
+          const statusEl = document.getElementById('stat-status');
+          statusEl.innerText = 'Expired / Unpaid';
+          statusEl.style.color = 'var(--error-text)';
+          document.getElementById('dashboard-sub-banner').classList.remove('hidden');
+          document.getElementById('floating-upgrade-btn').classList.remove('hidden');
+          document.getElementById('sub-action-panel').classList.remove('hidden');
+          openSubModal();
         }
       } catch(e) {
         console.error('Failed fetching stats', e);
