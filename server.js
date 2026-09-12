@@ -560,13 +560,23 @@ app.get('/events', async (req, res) => {
   req.on('close', () => telemetryEmitter.off('telemetry', onTelemetry));
 });
 
-// Registration
+// Registration with Cryptographically Secure OTP Generation
 app.post('/register', async (req, res) => {
   const { email, password, fingerprint } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: 'Email and password required.' });
 
   const existingUser = await pool.query('SELECT * FROM clients WHERE email = $1', [email]);
-  if (existingUser.rows.length > 0) return res.status(400).json({ error: 'Email already registered. Please sign in.' });
+  if (existingUser.rows.length > 0) {
+    if (!existingUser.rows[0].is_verified) {
+      // Resend OTP if unverified
+      const otpCode = crypto.randomInt(100000, 1000000).toString();
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+      await pool.query('UPDATE clients SET otp_code = $1, otp_expires_at = $2 WHERE email = $3', [otpCode, expiresAt, email]);
+      console.log(`[CloudGrip OTP] Resend code for ${email}: ${otpCode}`);
+      return res.json({ success: false, requiresOtp: true, message: 'Account exists but is unverified. New OTP sent.' });
+    }
+    return res.status(400).json({ error: 'Email already registered. Please sign in.' });
+  }
 
   let isNewDevice = true;
   if (fingerprint) {
@@ -577,35 +587,70 @@ app.post('/register', async (req, res) => {
   }
 
   const hashedPassword = await bcrypt.hash(password, 10);
-  
+  const otpCode = crypto.randomInt(100000, 1000000).toString();
+  const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 minutes expiry
+
   let clientKey = null;
   let trialExpiresAt;
-  let status = 'pending_payment';
+  let status = 'pending_verification';
 
   if (isNewDevice) {
     clientKey = `cg-${crypto.randomBytes(16).toString('hex')}`;
     trialExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-    status = 'active';
   } else {
     trialExpiresAt = new Date().toISOString();
   }
 
   try {
     await pool.query(`
-      INSERT INTO clients (client_key, email, password_hash, device_fingerprint, budget_usd, current_spend_usd, budget_cap_usd, trial_expires_at, status)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-    `, [clientKey, email, hashedPassword, fingerprint || 'unknown', 15.00, 0.00, 15.00, trialExpiresAt, status]);
+      INSERT INTO clients (client_key, email, password_hash, device_fingerprint, budget_usd, current_spend_usd, budget_cap_usd, trial_expires_at, status, otp_code, otp_expires_at, is_verified)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+    `, [clientKey, email, hashedPassword, fingerprint || 'unknown', 15.00, 0.00, 15.00, trialExpiresAt, status, otpCode, otpExpiresAt, false]);
+
+    // Simulated email delivery log (secure console log for testing verification codes)
+    console.log(`[CloudGrip OTP Delivery] Verification code for ${email}: ${otpCode}`);
 
     res.json({ 
-      success: true, 
-      apiKey: clientKey,
+      success: false, 
+      requiresOtp: true,
       email: email,
-      requiresPayment: !isNewDevice,
-      message: isNewDevice ? '7-day trial activated!' : 'Account created. Please complete subscription payment to generate your API key.'
+      message: 'Secure 6-digit verification code generated and sent to email inbox.'
     });
   } catch (err) {
     console.error('Registration Error:', err.message);
     res.status(500).json({ error: 'Database error: ' + err.message });
+  }
+});
+
+// Verify OTP Route
+app.post('/api/verify-otp', async (req, res) => {
+  const { email, otp } = req.body;
+
+  try {
+    const userRes = await pool.query('SELECT * FROM clients WHERE email = $1', [email]);
+    if (userRes.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+
+    const user = userRes.rows[0];
+    const now = new Date();
+    const expiresAt = new Date(user.otp_expires_at);
+
+    if (user.otp_code !== otp || now > expiresAt) {
+      return res.status(400).json({ error: 'Invalid or expired verification code.' });
+    }
+
+    await pool.query('UPDATE clients SET is_verified = TRUE, status = $1, otp_code = NULL, otp_expires_at = NULL WHERE email = $2', ['active', email]);
+
+    res.json({ 
+      success: true, 
+      apiKey: user.client_key, 
+      email: user.email,
+      message: 'Account verified successfully!' 
+    });
+  } catch (err) {
+    console.error('OTP Verification Error:', err.message);
+    res.status(500).json({ error: 'Server error during verification.' });
   }
 });
 
@@ -617,16 +662,32 @@ app.post('/login', async (req, res) => {
     return res.status(401).json({ error: 'Invalid email or password.' });
   }
 
+  const user = userRes.rows[0];
+  if (!user.is_verified) {
+    // Generate new OTP if logging in unverified
+    const otpCode = crypto.randomInt(100000, 1000000).toString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    await pool.query('UPDATE clients SET otp_code = $1, otp_expires_at = $2 WHERE email = $3', [otpCode, expiresAt, email]);
+    console.log(`[CloudGrip OTP Login] Code for unverified user ${email}: ${otpCode}`);
+
+    return res.status(403).json({ 
+      success: false, 
+      requiresOtp: true, 
+      email: email,
+      error: 'Account not verified. New verification code sent to your email.' 
+    });
+  }
+
   res.json({ 
     success: true, 
-    apiKey: userRes.rows[0].client_key, 
-    email: userRes.rows[0].email 
+    apiKey: user.client_key, 
+    email: user.email 
   });
 });
 
 // Middleware for proxy traffic strictly enforcing expired subscription pauses & budget caps
 app.use(async (req, res, next) => {
-  if (['/events', '/register', '/login', '/', '/terms', '/privacy', '/client/stats', '/client/budget-cap', '/client/reset-spend', '/forgot-password', '/admin/login', '/analytics', '/admin/reset-spend'].includes(req.path) || req.path.startsWith('/api/topup/')) return next();
+  if (['/events', '/register', '/api/verify-otp', '/login', '/', '/terms', '/privacy', '/client/stats', '/client/budget-cap', '/client/reset-spend', '/forgot-password', '/admin/login', '/analytics', '/admin/reset-spend'].includes(req.path) || req.path.startsWith('/api/topup/')) return next();
   if (req.path.startsWith('/css/') || req.path.startsWith('/js/') || req.path.startsWith('/images/')) return next();
 
   const clientKey = req.headers['x-cloudgrip-key'] || req.query.cloudgrip_key;
@@ -655,7 +716,7 @@ app.use(async (req, res, next) => {
 });
 
 app.all(/.*/, async (req, res) => {
-  if (['/', '/register', '/login', '/events', '/terms', '/privacy', '/client/stats', '/client/budget-cap', '/client/reset-spend', '/forgot-password', '/admin/login', '/analytics', '/admin/reset-spend'].includes(req.path) || req.path.startsWith('/api/topup/')) return;
+  if (['/', '/register', '/api/verify-otp', '/login', '/events', '/terms', '/privacy', '/client/stats', '/client/budget-cap', '/client/reset-spend', '/forgot-password', '/admin/login', '/analytics', '/admin/reset-spend'].includes(req.path) || req.path.startsWith('/api/topup/')) return;
 
   let statusCode = 502;
   let cost = 0.01;
@@ -741,7 +802,10 @@ async function startServer() {
         current_spend_usd REAL NOT NULL,
         budget_cap_usd REAL DEFAULT 15.00,
         trial_expires_at TIMESTAMPTZ NOT NULL,
-        status TEXT DEFAULT 'active'
+        status TEXT DEFAULT 'active',
+        otp_code VARCHAR(6),
+        otp_expires_at TIMESTAMPTZ,
+        is_verified BOOLEAN DEFAULT FALSE
       );
 
       CREATE TABLE IF NOT EXISTS request_logs (

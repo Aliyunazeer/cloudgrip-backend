@@ -436,74 +436,92 @@
     footer a { color: var(--text-muted); text-decoration: none; margin-left: 16px; }
 
     /* ==========================================================================
-   CloudGrip Ultra-Thin Mobile Fixes (< 768px)
-   ========================================================================== */
+       CloudGrip Ultra-Thin Mobile Fixes (< 768px)
+       ========================================================================== */
+    @media (max-width: 768px) {
+      nav {
+        padding: 0 16px;
+      }
+      header, nav {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        width: 100% !important;
+        box-sizing: border-box;
+      }
 
-@media (max-width: 768px) {
-  /* Tighten header padding and enable flex-wrap for ultra-thin screens */
-  header {
-    display: flex !important;
-    flex-wrap: wrap !important;
-    justify-content: space-between !important;
-    align-items: center !important;
-    padding: 10px 12px !important;
-    gap: 8px !important;
-    width: 100% !important;
-    box-sizing: border-box;
-  }
+      .nav-links {
+        gap: 12px !important;
+      }
 
-  /* Compress navigation links slightly so 'Sign In' never gets pushed off */
-  header nav, 
-  .nav-links, 
-  .header-actions {
-    display: flex !important;
-    flex-wrap: wrap !important;
-    gap: 8px !important;
-    align-items: center !important;
-  }
+      .nav-links a {
+        font-size: 0.75rem !important;
+        padding: 2px 2px !important;
+        white-space: nowrap !important;
+      }
 
-  header nav a, 
-  .nav-links a,
-  .header-actions a {
-    font-size: 0.75rem !important;
-    padding: 2px 4px !important;
-    white-space: nowrap !important;
-  }
+      /* Fixed Mobile Hamburger Drawer Toggle */
+      .sidebar {
+        position: fixed !important;
+        top: 60px !important;
+        left: -240px !important;
+        height: calc(100vh - 60px) !important;
+        width: 220px !important;
+        transition: left 0.3s ease-in-out !important;
+        box-shadow: 4px 0 24px rgba(0,0,0,0.9);
+      }
 
-  /* Force the post-login Hamburger Menu Button to stay locked and visible in the header */
-  .hamburger-icon, 
-  .menu-toggle,
-  #sidebar-toggle {
-    display: flex !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    position: relative !important;
-    z-index: 1005 !important;
-    background: #18181b !important;
-    border: 1px solid #27272a !important;
-    color: #ffffff !important;
-    padding: 6px 10px !important;
-    border-radius: 4px !important;
-    cursor: pointer;
-  }
+      .sidebar.mobile-open {
+        left: 0 !important;
+      }
 
-  /* Ensure dashboard view respects mobile bounds */
-  .dashboard-container, 
-  .main-content {
-    padding: 8px !important;
-    margin: 0 !important;
-    width: 100% !important;
-    box-sizing: border-box;
-  }
-}
+      .sidebar:hover {
+        width: 220px !important;
+      }
+
+      .sidebar .sidebar-label {
+        opacity: 1 !important;
+      }
+
+      /* Mobile Hamburger Menu Activation Button */
+      #mobile-hamburger-btn {
+        display: flex !important;
+        align-items: center;
+        gap: 6px;
+        background: #18181b;
+        border: 1px solid var(--border);
+        color: #fff;
+        padding: 6px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+        cursor: pointer;
+        margin-right: 12px;
+      }
+
+      .dashboard-main {
+        padding: 16px !important;
+        width: 100% !important;
+      }
+    }
+
+    #mobile-hamburger-btn {
+      display: none;
+    }
   </style>
 </head>
 <body>
 
   <nav>
-    <div class="nav-brand">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-      <h1>cloudgrip/core</h1>
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <button id="mobile-hamburger-btn" onclick="toggleMobileSidebar()">
+        <svg style="width:16px; height:16px; fill:currentColor;" viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+        Menu
+      </button>
+      <div class="nav-brand">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        <h1>cloudgrip/core</h1>
+      </div>
     </div>
     <div class="nav-links">
       <a href="#features" id="link-features" onclick="showLandingView()">Features</a>
@@ -627,16 +645,30 @@
       <div id="error-msg" class="error-box hidden"></div>
       <div id="success-msg" class="success-box hidden"></div>
 
-      <div class="form-group">
-        <label style="display:block; font-size:11px; color:var(--text-muted); margin-bottom:4px;">Work Email</label>
-        <input type="email" id="auth-email" placeholder="name@company.com">
-      </div>
-      <div class="form-group">
-        <label style="display:block; font-size:11px; color:var(--text-muted); margin-bottom:4px;">Password</label>
-        <input type="password" id="auth-pass" placeholder="••••••••">
+      <div id="auth-form-fields">
+        <div class="form-group">
+          <label style="display:block; font-size:11px; color:var(--text-muted); margin-bottom:4px;">Work Email</label>
+          <input type="email" id="auth-email" placeholder="name@company.com">
+        </div>
+        <div class="form-group">
+          <label style="display:block; font-size:11px; color:var(--text-muted); margin-bottom:4px;">Password</label>
+          <input type="password" id="auth-pass" placeholder="••••••••">
+        </div>
+
+        <button id="auth-submit-btn" class="btn btn-primary" style="width:100%" onclick="handleAuthSubmit()">Sign In</button>
       </div>
 
-      <button id="auth-submit-btn" class="btn btn-primary" style="width:100%" onclick="handleAuthSubmit()">Sign In</button>
+      <!-- OTP VERIFICATION FORM SECTION (Hidden by default) -->
+      <div id="otp-verify-section" class="hidden">
+        <div style="background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.2); padding: 12px; border-radius: var(--radius-sm); margin-bottom: 14px; font-size: 12px; color: var(--accent);">
+          Secure 6-digit code sent to <strong id="otp-sent-email"></strong>. Enter it below to verify your email.
+        </div>
+        <div class="form-group">
+          <label style="display:block; font-size:11px; color:var(--text-muted); margin-bottom:4px;">6-Digit OTP Code</label>
+          <input type="text" id="otp-input-code" maxlength="6" placeholder="123456" style="text-align: center; letter-spacing: 4px; font-size: 16px; font-family: 'JetBrains Mono', monospace;">
+        </div>
+        <button class="btn btn-primary" style="width:100%" onclick="handleOtpVerification()">Confirm & Activate Account</button>
+      </div>
       
       <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px; font-size: 11.5px;">
         <a href="#" id="auth-toggle-link" onclick="toggleAuthMode(); return false;" style="color: var(--text-muted); text-decoration:none;">Need an account? Sign up</a>
@@ -830,6 +862,7 @@
     let isSignUpMode = false;
     let eventSource = null;
     let isPaidTier = false;
+    let pendingVerificationEmail = '';
 
     window.onload = async () => {
       const urlParams = new URLSearchParams(window.location.search);
@@ -857,8 +890,8 @@
       document.getElementById('landing-view').classList.remove('hidden');
       document.getElementById('auth-view').classList.add('hidden');
       document.getElementById('dashboard-view').classList.add('hidden');
+      document.getElementById('mobile-hamburger-btn').style.display = 'none';
       
-      // Show landing nav items again
       document.getElementById('link-features').style.display = 'inline';
       document.getElementById('link-pricing').style.display = 'inline';
       document.getElementById('link-github').style.display = 'inline';
@@ -870,6 +903,11 @@
       document.getElementById('landing-view').classList.add('hidden');
       document.getElementById('dashboard-view').classList.add('hidden');
       document.getElementById('auth-view').classList.remove('hidden');
+      document.getElementById('mobile-hamburger-btn').style.display = 'none';
+      
+      // Reset auth form blocks
+      document.getElementById('auth-form-fields').classList.remove('hidden');
+      document.getElementById('otp-verify-section').classList.add('hidden');
       
       const titleEl = document.getElementById('auth-title');
       const descEl = document.getElementById('auth-desc');
@@ -879,7 +917,7 @@
       if (isSignUpMode) {
         titleEl.innerText = "Create CloudGrip Account";
         descEl.innerText = "Start your trial or setup your agency team gateway.";
-        btnEl.innerText = "Register & Continue";
+        btnEl.innerText = "Register & Send OTP";
         toggleEl.innerText = "Already have an account? Sign in";
       } else {
         titleEl.innerText = "Sign In to Dashboard";
@@ -906,6 +944,13 @@
       document.getElementById('success-msg').classList.add('hidden');
     }
 
+    function showSuccess(msg) {
+      const box = document.getElementById('success-msg');
+      box.innerText = msg;
+      box.classList.remove('hidden');
+      document.getElementById('error-msg').classList.add('hidden');
+    }
+
     async function handleAuthSubmit() {
       hideMsg();
       const email = document.getElementById('auth-email').value.trim();
@@ -927,10 +972,12 @@
           if (data.apiKey) localStorage.setItem('cloudgrip_key', data.apiKey);
           localStorage.setItem('cloudgrip_email', email);
           await loadDashboard(data.apiKey, email);
-        } else if (data.requiresPayment) {
-          localStorage.setItem('cloudgrip_email', email);
-          showError(data.error || 'Subscription payment required to generate key.');
-          payWithPaystack();
+        } else if (data.requiresOtp) {
+          pendingVerificationEmail = data.email || email;
+          document.getElementById('otp-sent-email').innerText = pendingVerificationEmail;
+          document.getElementById('auth-form-fields').classList.add('hidden');
+          document.getElementById('otp-verify-section').classList.remove('hidden');
+          showSuccess(data.message || 'Verification code sent.');
         } else {
           showError(data.error || 'Authentication failed.');
         }
@@ -939,12 +986,41 @@
       }
     }
 
+    async function handleOtpVerification() {
+      hideMsg();
+      const otp = document.getElementById('otp-input-code').value.trim();
+      if (!otp || otp.length !== 6) return showError('Please enter a valid 6-digit verification code.');
+
+      try {
+        const res = await fetch('/api/verify-otp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: pendingVerificationEmail, otp })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          if (data.apiKey) localStorage.setItem('cloudgrip_key', data.apiKey);
+          localStorage.setItem('cloudgrip_email', pendingVerificationEmail);
+          alert(data.message);
+          await loadDashboard(data.apiKey, pendingVerificationEmail);
+        } else {
+          showError(data.error || 'Invalid code.');
+        }
+      } catch (e) {
+        showError('Network connectivity error during verification.');
+      }
+    }
+
     async function loadDashboard(key, email) {
       document.getElementById('landing-view').classList.add('hidden');
       document.getElementById('auth-view').classList.add('hidden');
       document.getElementById('dashboard-view').classList.remove('hidden');
       
-      // Hide Features, Pricing, and GitHub from top navbar when inside dashboard
+      if (window.innerWidth <= 768) {
+        document.getElementById('mobile-hamburger-btn').style.display = 'flex';
+      }
+
       document.getElementById('link-features').style.display = 'none';
       document.getElementById('link-pricing').style.display = 'none';
       document.getElementById('link-github').style.display = 'none';
@@ -973,7 +1049,6 @@
           const trialExpiry = data.trialExpiresAt ? new Date(data.trialExpiresAt) : new Date(0);
           const isExpired = data.status === 'expired' || now > trialExpiry || !key;
 
-          // Check if user has active paid/trial status
           isPaidTier = !isExpired && data.status === 'active';
 
           if (isPaidTier) {
@@ -996,8 +1071,16 @@
       }
     }
 
+    function toggleMobileSidebar() {
+      const sidebar = document.getElementById('app-sidebar');
+      sidebar.classList.toggle('mobile-open');
+    }
+
     function switchDashboardTab(tabName, el) {
-      // Restrict paid-only tabs if user is on free tier
+      if (window.innerWidth <= 768) {
+        document.getElementById('app-sidebar').classList.remove('mobile-open');
+      }
+
       const restrictedTabs = ['keys', 'budget', 'teams', 'webhooks'];
       if (!isPaidTier && restrictedTabs.includes(tabName)) {
         document.querySelectorAll('.dashboard-tab-content').forEach(el => el.classList.add('hidden'));
