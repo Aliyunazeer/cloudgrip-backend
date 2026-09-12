@@ -10,7 +10,13 @@
   "scripts": {
     "start": "node server.js"
   },
-  "keywords": ["ai", "proxy", "rate-limit", "budget-cap", "llm"],
+  "keywords": [
+    "ai",
+    "proxy",
+    "rate-limit",
+    "budget-cap",
+    "llm"
+  ],
   "author": "Aliyu Nazeer",
   "license": "MIT",
   "dependencies": {
@@ -23,6 +29,7 @@
     "express": "^5.2.1",
     "express-session": "^1.19.0",
     "http-proxy-middleware": "^4.2.0",
+    "nodemailer": "^10.0.10",
     "pg": "^8.23.0"
   }
 }

@@ -11,6 +11,7 @@ import fs from 'fs';
 import path from 'path';
 import axios from 'axios';
 import { fileURLToPath } from 'url';
+import nodemailer from 'nodemailer';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -24,6 +25,15 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
   family: 4
+});
+
+// Configure Nodemailer Email Transporter
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS
+  }
 });
 
 app.use(express.json({ limit: '10mb' }));
@@ -180,7 +190,7 @@ app.post('/client/budget-cap', async (req, res) => {
   res.json({ success: true, message: 'Budget cap updated.' });
 });
 
-// Registration with Cryptographically Secure 6-Digit OTP Generation
+// Registration with Real Email Dispatch via Nodemailer
 app.post('/register', async (req, res) => {
   try {
     const { email, password, fingerprint } = req.body || {};
@@ -192,14 +202,22 @@ app.post('/register', async (req, res) => {
         const otpCode = crypto.randomInt(100000, 1000000).toString();
         const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
         await pool.query('UPDATE clients SET otp_code = $1, otp_expires_at = $2 WHERE email = $3', [otpCode, expiresAt, email]);
-        console.log(`[CloudGrip Secure OTP] Resend code for ${email}: ${otpCode}`);
-        return res.json({ success: false, requiresOtp: true, message: 'Unverified account. New 6-digit OTP code sent.' });
+        
+        // Dispatch real email
+        await transporter.sendMail({
+          from: '"CloudGrip Security" <no-reply@cloudgrip.ai>',
+          to: email,
+          subject: 'Your CloudGrip Verification Code',
+          text: `Your new 6-digit verification code is: ${otpCode}. It expires in 10 minutes.`
+        });
+
+        return res.json({ success: false, requiresOtp: true, message: 'Unverified account. New 6-digit OTP code sent to your email.' });
       }
       return res.status(400).json({ error: 'Email already registered. Please sign in.' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const otpCode = crypto.randomInt(100000, 1000000).toString(); // Secure random 6-digit integer
+    const otpCode = crypto.randomInt(100000, 1000000).toString();
     const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
     const clientKey = `cg-${crypto.randomBytes(16).toString('hex')}`;
     const trialExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -209,17 +227,23 @@ app.post('/register', async (req, res) => {
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
     `, [clientKey, email, hashedPassword, fingerprint || 'unknown', 15.00, 0.00, 15.00, trialExpiresAt, 'pending_verification', otpCode, otpExpiresAt, false]);
 
-    console.log(`[CloudGrip Secure OTP Delivery] Verification code for ${email}: ${otpCode}`);
+    // Dispatch real email via Nodemailer
+    await transporter.sendMail({
+      from: '"CloudGrip Security" <no-reply@cloudgrip.ai>',
+      to: email,
+      subject: 'Your CloudGrip Verification Code',
+      text: `Your 6-digit verification code is: ${otpCode}. It expires in 10 minutes.`
+    });
 
     res.json({ 
       success: false, 
       requiresOtp: true,
       email: email,
-      message: 'Cryptographically secure 6-digit code dispatched to inbox.'
+      message: 'Verification code sent successfully to your email.'
     });
   } catch (err) {
-    console.error('Registration Error:', err.message);
-    res.status(500).json({ error: 'Server error during registration.' });
+    console.error('Registration/Email Error:', err.message);
+    res.status(500).json({ error: 'Failed to send verification email. Please check server configuration.' });
   }
 });
 
@@ -264,11 +288,19 @@ app.post('/login', async (req, res) => {
       const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
       await pool.query('UPDATE clients SET otp_code = $1, otp_expires_at = $2 WHERE email = $3', [otpCode, expiresAt, email]);
       
+      // Dispatch real email on login attempt if unverified
+      await transporter.sendMail({
+        from: '"CloudGrip Security" <no-reply@cloudgrip.ai>',
+        to: email,
+        subject: 'Your CloudGrip Verification Code',
+        text: `Your 6-digit verification code is: ${otpCode}. It expires in 10 minutes.`
+      });
+
       return res.status(403).json({ 
         success: false, 
         requiresOtp: true, 
         email: email,
-        error: 'Unverified account. New 6-digit code sent.' 
+        error: 'Unverified account. New 6-digit code sent to your email.' 
       });
     }
 
