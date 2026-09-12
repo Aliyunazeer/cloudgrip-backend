@@ -1,35 +1,34 @@
-# CloudGrip AI
+# CloudGrip
 
-Real-time API reverse proxy and automated circuit breaker for autonomous AI agents.
+CloudGrip is a local proxy gateway designed to protect developer API budgets and intercept runaway agent loops before unexpected charges occur.
 
-I built CloudGrip AI to solve a specific problem: runaway API bills caused by autonomous AI agents getting stuck in unexpected loops. CloudGrip AI sits directly between your application client and upstream LLM providers (such as Google Gemini or OpenAI). It tracks spend per request and immediately cuts off traffic at the proxy level once a predefined budget threshold is reached.
+## The Problem
 
-## Features
+When building automated software workflows or multi-step AI agents, scripts often communicate with language model APIs in rapid loops. If a small logic error occurs, an agent can get stuck talking to itself endlessly. Without guardrails, these recursive loops can execute thousands of requests overnight, resulting in surprise bills.
 
-- **Inline Proxying:** Intercepts traffic with minimal overhead using Express and `http-proxy-middleware`.
-- **Automated Killswitch:** Evaluates accumulated cost on every request and responds with an HTTP 429 error to drop further upstream traffic when the budget cap is hit.
-- **Server-Sent Events (SSE):** Streams request logs, spend metrics, and circuit breaker status directly to the frontend in real time without polling.
-- **Real-Time Dashboard:** Minimalist dark UI built with Tailwind CSS to visualize live spend, traffic counts, and system status.
+## How CloudGrip Works
 
-## Tech Stack
+CloudGrip sits locally between your application code and the upstream API provider. 
 
-- **Backend:** Node.js, Express, `http-proxy-middleware`
-- **Streaming:** Server-Sent Events (SSE)
-- **Frontend:** HTML5, Tailwind CSS
-- **Hosting:** Render
+1. **Interception:** All outgoing API traffic routes through your CloudGrip instance.
+2. **Consumption Tracking:** It tracks cumulative spending locally or via your private database.
+3. **Hard-Cap Circuit Breaker:** The moment your strict budget ceiling (defaulting to $15.00) is reached, CloudGrip automatically blocks further requests, stopping runaway loops dead in their tracks.
 
-## How It Works
+## Quick Installation
 
-1. Incoming requests hit the CloudGrip AI proxy endpoint.
-2. The middleware increments internal spend tracking and evaluates the total against the hard budget cap (set to $0.50 in the current demo).
-3. If spend is within limits, the proxy forwards the request to the target provider (`generativelanguage.googleapis.com`) and streams telemetry data to the dashboard.
-4. If the budget cap is exceeded, the proxy blocks the request, triggers a `KILLSWITCH_TRIGGERED` event over SSE, and returns a 429 status code.
-
-## Local Setup
-
-### 1. Repository Setup and Installation
+To install the proxy package in your project environment, run:
 
 ```bash
-git clone [https://github.com/Aliyunazeer/cloudgrip-backend.git](https://github.com/Aliyunazeer/cloudgrip-backend.git)
-cd cloudgrip-backend
-npm install
+npm install cloudgrip-proxy
+
+
+Getting Started
+1. Set up your environment variables or local connection string.
+
+2. Route your application client requests through the local proxy gateway.
+
+3. Access your control dashboard to monitor real-time telemetry streams and configure your hard spending caps.
+
+License
+This project is open-source software released under the MIT License.
+
