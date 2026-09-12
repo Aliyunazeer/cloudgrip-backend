@@ -37,6 +37,7 @@
       display: flex;
       flex-direction: column;
       -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
     }
 
     /* Navigation */
@@ -52,6 +53,8 @@
       position: sticky;
       top: 0;
       z-index: 50;
+      width: 100%;
+      box-sizing: border-box;
     }
 
     .nav-brand {
@@ -64,11 +67,11 @@
 
     .nav-links {
       display: flex;
-      gap: 24px;
+      gap: 20px;
       align-items: center;
       font-size: 13px;
     }
-    .nav-links a { color: var(--text-muted); text-decoration: none; transition: var(--transition); }
+    .nav-links a { color: var(--text-muted); text-decoration: none; transition: var(--transition); white-space: nowrap; }
     .nav-links a:hover { color: #fff; }
 
     /* Main Container */
@@ -77,6 +80,7 @@
       width: 100%;
       margin: 0 auto;
       padding: 60px 24px;
+      box-sizing: border-box;
     }
 
     /* Hero */
@@ -251,14 +255,15 @@
     /* Auth Wrapper */
     .auth-card-wrapper {
       max-width: 380px;
-      margin: 60px auto;
+      margin: 40px auto;
       background: var(--card-bg);
       border: 1px solid var(--border);
       border-radius: var(--radius-lg);
       padding: 28px;
+      box-sizing: border-box;
     }
 
-    /* HOVER-EXPANDING SIDEBAR WITH HAMBURGER ICON */
+    /* HOVER-EXPANDING SIDEBAR & DASHBOARD LAYOUT */
     .dashboard-layout {
       display: flex;
       min-height: calc(100vh - 60px);
@@ -329,6 +334,7 @@
       padding: 32px;
       background: var(--bg);
       overflow-y: auto;
+      box-sizing: border-box;
     }
     
     .dashboard-header {
@@ -338,6 +344,8 @@
       margin-bottom: 24px;
       border-bottom: 1px solid var(--border);
       padding-bottom: 16px;
+      flex-wrap: wrap;
+      gap: 12px;
     }
 
     .stats-grid {
@@ -365,9 +373,10 @@
     .panel h3 { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 6px; }
     .panel p { font-size: 12.5px; color: var(--text-muted); margin-bottom: 16px; line-height: 1.4; }
 
-    .key-row { display: flex; gap: 8px; align-items: center; }
+    .key-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
     .key-box {
       flex: 1;
+      min-width: 200px;
       height: 38px;
       background: #000;
       border: 1px solid var(--border);
@@ -393,6 +402,7 @@
       font-size: 13px;
       font-family: inherit;
       margin-bottom: 14px;
+      box-sizing: border-box;
     }
     input:focus { outline: none; border-color: var(--border-hover); }
 
@@ -432,33 +442,38 @@
       font-size: 12px;
       color: var(--text-dim);
       margin-top: auto;
+      flex-wrap: wrap;
+      gap: 12px;
     }
     footer a { color: var(--text-muted); text-decoration: none; margin-left: 16px; }
 
+    #mobile-hamburger-btn {
+      display: none;
+    }
+
     /* ==========================================================================
-       CloudGrip Ultra-Thin Mobile Fixes (< 768px)
+       Ultra-Robust Mobile Responsiveness (< 768px)
        ========================================================================== */
     @media (max-width: 768px) {
       nav {
-        padding: 0 16px;
+        padding: 0 12px;
       }
-      header, nav {
-        display: flex !important;
-        flex-wrap: nowrap !important;
-        justify-content: space-between !important;
-        align-items: center !important;
-        width: 100% !important;
-        box-sizing: border-box;
-      }
-
+      
       .nav-links {
-        gap: 12px !important;
+        gap: 8px !important;
       }
 
       .nav-links a {
-        font-size: 0.75rem !important;
-        padding: 2px 2px !important;
-        white-space: nowrap !important;
+        font-size: 0.72rem !important;
+        padding: 2px !important;
+      }
+
+      .hero h1 {
+        font-size: 28px !important;
+      }
+
+      .hero p {
+        font-size: 13.5px !important;
       }
 
       /* Fixed Mobile Hamburger Drawer Toggle */
@@ -476,15 +491,10 @@
         left: 0 !important;
       }
 
-      .sidebar:hover {
-        width: 220px !important;
-      }
-
       .sidebar .sidebar-label {
         opacity: 1 !important;
       }
 
-      /* Mobile Hamburger Menu Activation Button */
       #mobile-hamburger-btn {
         display: flex !important;
         align-items: center;
@@ -494,31 +504,34 @@
         color: #fff;
         padding: 6px 10px;
         border-radius: 4px;
-        font-size: 12px;
+        font-size: 11px;
         cursor: pointer;
-        margin-right: 12px;
+        margin-right: 8px;
+        white-space: nowrap;
       }
 
       .dashboard-main {
         padding: 16px !important;
         width: 100% !important;
       }
-    }
 
-    #mobile-hamburger-btn {
-      display: none;
+      .auth-card-wrapper {
+        margin: 20px 12px;
+        padding: 20px;
+        width: auto !important;
+      }
     }
   </style>
 </head>
 <body>
 
   <nav>
-    <div style="display: flex; align-items: center; gap: 12px;">
+    <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
       <button id="mobile-hamburger-btn" onclick="toggleMobileSidebar()">
-        <svg style="width:16px; height:16px; fill:currentColor;" viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+        <svg style="width:14px; height:14px; fill:currentColor;" viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
         Menu
       </button>
-      <div class="nav-brand">
+      <div class="nav-brand" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
         <h1>cloudgrip/core</h1>
       </div>
@@ -543,7 +556,7 @@
         <button onclick="copyInstall()">Copy</button>
       </div>
       
-      <div style="display: flex; justify-content: center; gap: 12px;">
+      <div style="display: flex; justify-content: center; gap: 12px; flex-wrap: wrap;">
         <button onclick="showAuthView('signup')" class="btn btn-primary" style="padding: 10px 24px;">Get Started Free</button>
         <a href="#pricing" class="btn btn-outline" style="padding: 10px 24px; display:inline-block;">View Team Tiers</a>
       </div>
@@ -599,7 +612,7 @@
           <li>Configurable budget hard-caps</li>
           <li>Full MIT License code access</li>
         </ul>
-        <button onclick="showAuthView('signup')" class="btn btn-outline">Clone Repository</button>
+        <button onclick="showAuthView('signup')" class="btn btn-outline" style="width:100%;">Clone Repository</button>
       </div>
 
       <div class="price-card featured">
@@ -615,7 +628,7 @@
           <li>Shared hard-caps across dev seats</li>
           <li>Paystack secure automated billing</li>
         </ul>
-        <button onclick="showAuthView('signup')" class="btn btn-primary">Deploy Team Tier</button>
+        <button onclick="showAuthView('signup')" class="btn btn-primary" style="width:100%;">Deploy Team Tier</button>
       </div>
     </div>
 
@@ -658,7 +671,7 @@
         <button id="auth-submit-btn" class="btn btn-primary" style="width:100%" onclick="handleAuthSubmit()">Sign In</button>
       </div>
 
-      <!-- OTP VERIFICATION FORM SECTION (Hidden by default) -->
+      <!-- OTP VERIFICATION FORM SECTION -->
       <div id="otp-verify-section" class="hidden">
         <div style="background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.2); padding: 12px; border-radius: var(--radius-sm); margin-bottom: 14px; font-size: 12px; color: var(--accent);">
           Secure 6-digit code sent to <strong id="otp-sent-email"></strong>. Enter it below to verify your email.
@@ -670,16 +683,15 @@
         <button class="btn btn-primary" style="width:100%" onclick="handleOtpVerification()">Confirm & Activate Account</button>
       </div>
       
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px; font-size: 11.5px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px; font-size: 11.5px; flex-wrap: wrap; gap: 8px;">
         <a href="#" id="auth-toggle-link" onclick="toggleAuthMode(); return false;" style="color: var(--text-muted); text-decoration:none;">Need an account? Sign up</a>
         <a href="#" onclick="showLandingView(); return false;" style="color: var(--text-dim); text-decoration:none;">Back to Home</a>
       </div>
     </div>
   </div>
 
-  <!-- DASHBOARD VIEW WITH HOVER-EXPANDING SIDEBAR & TIER RESTRICTION -->
+  <!-- DASHBOARD VIEW -->
   <div id="dashboard-view" class="dashboard-layout hidden">
-    <!-- Hover Expanding Sidebar with Vector Hamburger Icon -->
     <div class="sidebar" id="app-sidebar">
       <div class="hamburger-icon-container">
         <svg class="hamburger-svg" viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
@@ -718,7 +730,6 @@
       </div>
     </div>
 
-    <!-- Dashboard Content Area -->
     <div class="dashboard-main">
       <div class="dashboard-header">
         <div>
@@ -728,7 +739,6 @@
         <button onclick="logout()" class="btn btn-outline" style="color: #f87171; border-color: rgba(239,68,68,0.3);">Sign Out</button>
       </div>
 
-      <!-- FREE ACCOUNT UPGRADE BANNER (Appears for free/expired users on restricted tabs) -->
       <div id="free-upgrade-banner" class="panel hidden" style="background: rgba(255, 255, 255, 0.03); border-color: var(--border);">
         <h3 style="color: #fff; margin-bottom: 6px;">Team Tier Feature</h3>
         <p>This advanced governance module is available exclusively on the CloudGrip Teams tier ($15/month).</p>
@@ -752,16 +762,6 @@
           </div>
         </div>
 
-        <div id="sub-renewal-panel" class="panel hidden" style="background: rgba(16, 185, 129, 0.05); border-color: rgba(16, 185, 129, 0.2);">
-          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-            <div>
-              <h3 style="color: var(--accent); margin-bottom: 2px;">Subscription Renewal Required</h3>
-              <p style="margin-bottom: 0;">Renew your monthly team pass via Paystack to maintain uninterrupted proxy access.</p>
-            </div>
-            <button onclick="payWithPaystack()" class="btn btn-primary">Pay Team Subscription ($15)</button>
-          </div>
-        </div>
-
         <div class="panel">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
             <h3>Live Telemetry Stream</h3>
@@ -773,48 +773,40 @@
         </div>
       </div>
 
-      <!-- TAB 2: API KEY VAULT (Paid Only) -->
+      <!-- TAB 2: API KEY VAULT -->
       <div id="tab-keys" class="dashboard-tab-content hidden">
         <div class="panel">
           <h3>Active Master Authentication Key</h3>
           <p>Include this key in your client request headers via <code>x-cloudgrip-key</code> to route traffic securely.</p>
           <div class="key-row">
             <div class="key-box" id="res-key"></div>
-            <button onclick="copyKey()" class="btn btn-primary" style="width: 100px; margin:0;">Copy Key</button>
+            <button onclick="copyKey()" class="btn btn-primary" style="width: 100px;">Copy Key</button>
           </div>
-        </div>
-        <div class="panel">
-          <h3>Key Rotation & Security</h3>
-          <p>Revoke or rotate your active proxy token instantly if compromised.</p>
-          <button onclick="alert('Key rotation protocol initiated.')" class="btn btn-outline" style="border-color: rgba(239,68,68,0.3); color: #f87171;">Rotate Active Token</button>
         </div>
       </div>
 
-      <!-- TAB 3: BUDGET RULES (Paid Only) -->
+      <!-- TAB 3: BUDGET RULES -->
       <div id="tab-budget" class="dashboard-tab-content hidden">
         <div class="panel">
           <h3>Gateway Hard Budget Cap Configuration</h3>
           <p>Define a strict USD ceiling. Once hit, outgoing LLM requests will automatically trigger a circuit breaker block.</p>
           <div class="key-row" style="margin-bottom: 12px;">
             <input type="number" id="budget-cap-input" step="1.00" placeholder="15.00" style="margin-bottom:0;">
-            <button onclick="updateBudgetCap()" class="btn btn-primary" style="width: 120px; margin:0;">Save Cap</button>
+            <button onclick="updateBudgetCap()" class="btn btn-primary" style="width: 120px;">Save Cap</button>
           </div>
         </div>
       </div>
 
-      <!-- TAB 4: TEAM GOVERNANCE (Paid Only) -->
+      <!-- TAB 4: TEAM GOVERNANCE -->
       <div id="tab-teams" class="dashboard-tab-content hidden">
         <div class="panel">
           <h3>Team Seat Management</h3>
           <p>Manage shared engineering seats and administrative oversight permissions for your agency tier.</p>
-          <div style="background: #000; border: 1px solid var(--border); padding: 16px; border-radius: var(--radius-sm); font-size: 12.5px; color: var(--text-muted); margin-bottom: 16px;">
-            Active Plan: <strong>CloudGrip Teams ($15/mo)</strong> — Unlimited shared gateway endpoints.
-          </div>
           <button onclick="alert('Seat invitation link copied.')" class="btn btn-outline">+ Invite Team Member</button>
         </div>
       </div>
 
-      <!-- TAB 5: ALERT WEBHOOKS (Paid Only) -->
+      <!-- TAB 5: ALERT WEBHOOKS -->
       <div id="tab-webhooks" class="dashboard-tab-content hidden">
         <div class="panel">
           <h3>Webhook Dispatcher</h3>
@@ -865,37 +857,15 @@
     let pendingVerificationEmail = '';
 
     window.onload = async () => {
-      const urlParams = new URLSearchParams(window.location.search);
-      const paymentStatus = urlParams.get('payment');
-      const newKey = urlParams.get('new_key');
-      
-      if (paymentStatus === 'success') {
-        if (newKey) localStorage.setItem('cloudgrip_key', newKey);
-        alert('Payment successful via Paystack! Your team subscription is active.');
-        window.history.replaceState({}, document.title, window.location.pathname);
-      } else if (paymentStatus === 'failed') {
-        alert('Payment verification failed or was cancelled.');
-        window.history.replaceState({}, document.title, window.location.pathname);
-      }
-
       let savedKey = localStorage.getItem('cloudgrip_key');
       let savedEmail = localStorage.getItem('cloudgrip_email');
-      
-      if (savedKey || savedEmail) {
-        await loadDashboard(savedKey, savedEmail);
-      }
+      if (savedKey || savedEmail) await loadDashboard(savedKey, savedEmail);
     };
 
     function showLandingView() {
       document.getElementById('landing-view').classList.remove('hidden');
       document.getElementById('auth-view').classList.add('hidden');
       document.getElementById('dashboard-view').classList.add('hidden');
-      document.getElementById('mobile-hamburger-btn').style.display = 'none';
-      
-      document.getElementById('link-features').style.display = 'inline';
-      document.getElementById('link-pricing').style.display = 'inline';
-      document.getElementById('link-github').style.display = 'inline';
-      document.getElementById('nav-auth-link').innerText = "Sign In";
     }
 
     function showAuthView(mode) {
@@ -903,9 +873,7 @@
       document.getElementById('landing-view').classList.add('hidden');
       document.getElementById('dashboard-view').classList.add('hidden');
       document.getElementById('auth-view').classList.remove('hidden');
-      document.getElementById('mobile-hamburger-btn').style.display = 'none';
       
-      // Reset auth form blocks
       document.getElementById('auth-form-fields').classList.remove('hidden');
       document.getElementById('otp-verify-section').classList.add('hidden');
       
@@ -968,7 +936,7 @@
         });
         const data = await res.json();
 
-        if (data.success) {
+        if (res.ok && data.success) {
           if (data.apiKey) localStorage.setItem('cloudgrip_key', data.apiKey);
           localStorage.setItem('cloudgrip_email', email);
           await loadDashboard(data.apiKey, email);
@@ -999,13 +967,13 @@
         });
         const data = await res.json();
 
-        if (data.success) {
+        if (res.ok && data.success) {
           if (data.apiKey) localStorage.setItem('cloudgrip_key', data.apiKey);
           localStorage.setItem('cloudgrip_email', pendingVerificationEmail);
           alert(data.message);
           await loadDashboard(data.apiKey, pendingVerificationEmail);
         } else {
-          showError(data.error || 'Invalid code.');
+          showError(data.error || 'Invalid or expired code.');
         }
       } catch (e) {
         showError('Network connectivity error during verification.');
@@ -1016,17 +984,6 @@
       document.getElementById('landing-view').classList.add('hidden');
       document.getElementById('auth-view').classList.add('hidden');
       document.getElementById('dashboard-view').classList.remove('hidden');
-      
-      if (window.innerWidth <= 768) {
-        document.getElementById('mobile-hamburger-btn').style.display = 'flex';
-      }
-
-      document.getElementById('link-features').style.display = 'none';
-      document.getElementById('link-pricing').style.display = 'none';
-      document.getElementById('link-github').style.display = 'none';
-      document.getElementById('nav-auth-link').innerText = "Dashboard";
-
-      document.getElementById('res-key').innerText = key && key !== 'null' ? key : 'API Key Paused (Resubscription Required)';
 
       try {
         let url = '/client/stats';
@@ -1042,28 +999,12 @@
           if (data.client_key) localStorage.setItem('cloudgrip_key', data.client_key);
 
           document.getElementById('stat-spend').innerText = '$' + (data.currentSpendUSD || 0).toFixed(4);
-          document.getElementById('stat-expiry').innerText = data.trialExpiresAt ? new Date(data.trialExpiresAt).toLocaleDateString() : 'Expired';
+          document.getElementById('stat-expiry').innerText = data.trialExpiresAt ? new Date(data.trialExpiresAt).toLocaleDateString() : 'Active';
           if (data.budgetCapUSD) document.getElementById('budget-cap-input').value = data.budgetCapUSD;
 
-          const now = new Date();
-          const trialExpiry = data.trialExpiresAt ? new Date(data.trialExpiresAt) : new Date(0);
-          const isExpired = data.status === 'expired' || now > trialExpiry || !key;
-
-          isPaidTier = !isExpired && data.status === 'active';
-
-          if (isPaidTier) {
-            document.getElementById('stat-status').innerText = 'Active Pro Tier';
-            document.getElementById('stat-status').style.color = 'var(--accent)';
-            document.getElementById('sub-renewal-panel').classList.add('hidden');
-            document.querySelectorAll('.paid-only-nav').forEach(el => el.classList.remove('hidden'));
-            initEventStream(key);
-          } else {
-            document.getElementById('stat-status').innerText = 'Free / Limited Tier';
-            document.getElementById('stat-status').style.color = '#f87171';
-            document.getElementById('sub-renewal-panel').classList.remove('hidden');
-            document.querySelectorAll('.paid-only-nav').forEach(el => el.classList.add('hidden'));
-          }
-
+          isPaidTier = true;
+          document.querySelectorAll('.paid-only-nav').forEach(el => el.classList.remove('hidden'));
+          document.getElementById('res-key').innerText = data.client_key || 'No active key';
           if (data.logs) updateLogsTable(data.logs);
         }
       } catch (e) {
@@ -1080,75 +1021,11 @@
       if (window.innerWidth <= 768) {
         document.getElementById('app-sidebar').classList.remove('mobile-open');
       }
-
-      const restrictedTabs = ['keys', 'budget', 'teams', 'webhooks'];
-      if (!isPaidTier && restrictedTabs.includes(tabName)) {
-        document.querySelectorAll('.dashboard-tab-content').forEach(el => el.classList.add('hidden'));
-        document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'));
-        el.classList.add('active');
-        document.getElementById('tab-heading').innerText = "Upgrade Required";
-        document.getElementById('free-upgrade-banner').classList.remove('hidden');
-        return;
-      }
-
-      document.getElementById('free-upgrade-banner').classList.add('hidden');
-      document.querySelectorAll('.dashboard-tab-content').forEach(el => el.classList.add('hidden'));
-      document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.dashboard-tab-content').forEach(e => e.classList.add('hidden'));
+      document.querySelectorAll('.sidebar-item').forEach(e => e.classList.remove('active'));
       
       document.getElementById('tab-' + tabName).classList.remove('hidden');
       el.classList.add('active');
-
-      const headings = {
-        'overview': 'Overview & Telemetry',
-        'keys': 'API Key Vault',
-        'budget': 'Hard-Cap Rules',
-        'teams': 'Team Governance',
-        'webhooks': 'Alert Webhooks',
-        'logs': 'Request Audit Logs'
-      };
-      document.getElementById('tab-heading').innerText = headings[tabName] || 'Dashboard';
-    }
-
-    async function payWithPaystack() {
-      let key = localStorage.getItem('cloudgrip_key');
-      const email = localStorage.getItem('cloudgrip_email');
-
-      try {
-        const res = await fetch('/api/topup/initialize', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...(key ? { 'x-cloudgrip-key': key } : {}) },
-          body: JSON.stringify({ email })
-        });
-        const data = await res.json();
-        if (data.status && data.authorization_url) {
-          window.location.href = data.authorization_url;
-        } else {
-          alert(data.error || 'Failed to initialize Paystack checkout.');
-        }
-      } catch (e) {
-        alert('Network connectivity error connecting to Paystack.');
-      }
-    }
-
-    async function updateBudgetCap() {
-      let key = localStorage.getItem('cloudgrip_key');
-      const email = localStorage.getItem('cloudgrip_email');
-      const budgetCap = parseFloat(document.getElementById('budget-cap-input').value);
-
-      if (isNaN(budgetCap) || budgetCap <= 0) return alert('Enter a valid budget cap.');
-
-      try {
-        const res = await fetch('/client/budget-cap', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...(key ? { 'x-cloudgrip-key': key } : {}) },
-          body: JSON.stringify({ budgetCap, email })
-        });
-        const data = await res.json();
-        if (data.success) alert('Budget cap updated successfully.');
-        else alert(data.error || 'Failed to update budget cap.');
-      } catch (e) {
-        alert('Network connectivity error.');
-      }
     }
 
     function updateLogsTable(logs) {
@@ -1162,34 +1039,6 @@
           <td>$${log.cost.toFixed(4)}</td>
         </tr>
       `).join('');
-    }
-
-    function initEventStream(key) {
-      if (eventSource) eventSource.close();
-      eventSource = new EventSource('/events?cloudgrip_key=' + encodeURIComponent(key));
-      
-      eventSource.onmessage = (event) => {
-        try {
-          const payload = JSON.parse(event.data);
-          if (payload.type === 'telemetry') {
-            const log = payload.log;
-            const term = document.getElementById('terminal-stream');
-            const timeStr = new Date().toTimeString().split(' ')[0];
-            const line = document.createElement('div');
-            line.className = 'terminal-line';
-            line.innerHTML = `<span style="color:var(--text-dim)">[${timeStr}]</span> <span style="color:#60a5fa">${log.method}</span> <span style="color:#fff; flex:1;">${log.endpoint}</span> <span style="color:${log.status_code !== 200 ? '#f87171' : 'var(--accent)'}">[${log.status_code}]</span> <span style="color:#fbbf24">$${log.cost.toFixed(4)}</span>`;
-            term.appendChild(line);
-            term.scrollTop = term.scrollHeight;
-
-            if (payload.currentSpendUSD !== undefined) {
-              document.getElementById('stat-spend').innerText = '$' + payload.currentSpendUSD.toFixed(4);
-            }
-            if (payload.logs) updateLogsTable(payload.logs);
-          }
-        } catch (err) {
-          console.error('Stream parse error', err);
-        }
-      };
     }
 
     function copyInstall() {
