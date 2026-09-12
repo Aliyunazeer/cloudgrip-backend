@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CloudGrip — High-Performance LLM Proxy & Anti-Abuse Gateway</title>
+  <title>CloudGrip - High-Performance LLM Proxy & Anti-Abuse Gateway</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -694,6 +694,12 @@
         <button class="btn btn-danger" style="width: auto; padding: 0 16px; margin: 0;" onclick="logout()">Sign Out</button>
       </div>
 
+      <!-- Expiry Notice Banner (Visible when subscription is paused/expired) -->
+      <div id="expiry-notice-banner" class="panel hidden" style="background: rgba(239, 68, 68, 0.08); border-color: rgba(239, 68, 68, 0.2);">
+        <h3 style="color: var(--error-text); margin-bottom: 4px;">Subscription Expired</h3>
+        <p id="expiry-notice-text" style="color: var(--error-text); margin-bottom: 0;"></p>
+      </div>
+
       <div class="stats-grid">
         <div class="stat-card">
           <div class="label">Total Proxy Traffic Spend</div>
@@ -729,14 +735,15 @@
             <button class="btn" style="width: 110px; margin:0;" onclick="copyKey()">Copy Key</button>
           </div>
 
-          <!-- Hard Budget Cap Configuration Panel -->
+          <!-- Hard Budget Cap & Refresh Cap Configuration Panel -->
           <div style="margin-top: 24px; border-top: 1px solid var(--border); padding-top: 20px;">
             <h3>Gateway Hard Budget Cap</h3>
             <p>Set a maximum USD spend threshold. Once reached, outgoing requests will automatically be blocked.</p>
-            <div class="key-row">
+            <div class="key-row" style="margin-bottom: 12px;">
               <input type="number" id="budget-cap-input" step="1.00" min="1.00" max="500.00" placeholder="20.00" style="flex: 1;">
               <button class="btn" style="width: 140px; margin:0; background: #3b82f6; color: #fff;" onclick="updateBudgetCap()">Save Cap Limit</button>
             </div>
+            <button class="btn btn-secondary" onclick="refreshClientCap()">Refresh Cap ($0.00)</button>
           </div>
 
           <!-- Dynamic Subscription Panel (Hidden automatically for active paid users) -->
@@ -785,10 +792,10 @@
 
   <!-- Tiny Floating Upgrade Button (Hidden automatically for active paid users) -->
   <button id="floating-upgrade-btn" class="floating-btn hidden" onclick="openSubModal()">
-    ⚡ Upgrade to Pro ($20/mo)
+    Upgrade to Pro ($20/mo)
   </button>
 
-  <!-- Ad-looking Subscription Popup Modal -->
+  <!-- Subscription Popup Modal -->
   <div id="sub-modal" class="modal-overlay">
     <div class="modal-card">
       <button class="modal-close" onclick="closeSubModal()">&times;</button>
@@ -996,7 +1003,7 @@
     async function loadDashboard(key, email) {
       document.getElementById('auth-container').classList.add('hidden');
       document.getElementById('dashboard').classList.remove('hidden');
-      document.getElementById('res-key').innerText = key && key !== 'null' ? key : 'API Key Revoked (Renewal Required)';
+      document.getElementById('res-key').innerText = key && key !== 'null' ? key : 'API Key Paused (Resubscription Required)';
 
       try {
         let url = '/client/stats';
@@ -1036,6 +1043,11 @@
             statusEl.innerText = 'Expired / Unpaid';
             statusEl.style.color = 'var(--error-text)';
             
+            if (data.notice) {
+              document.getElementById('expiry-notice-banner').classList.remove('hidden');
+              document.getElementById('expiry-notice-text').innerText = data.notice;
+            }
+
             document.getElementById('dashboard-sub-banner').classList.remove('hidden');
             document.getElementById('floating-upgrade-btn').classList.remove('hidden');
             document.getElementById('sub-action-panel').classList.remove('hidden');
@@ -1044,6 +1056,7 @@
             statusEl.innerText = 'Active Pro Tier';
             statusEl.style.color = 'var(--success-text)';
             
+            document.getElementById('expiry-notice-banner').classList.add('hidden');
             document.getElementById('dashboard-sub-banner').classList.add('hidden');
             document.getElementById('floating-upgrade-btn').classList.add('hidden');
             document.getElementById('sub-action-panel').classList.add('hidden');
@@ -1053,7 +1066,7 @@
           if(data.logs && data.logs.length > 0) {
             updateLogsTable(data.logs);
           }
-          if (key && key !== 'null' && key !== 'undefined') {
+          if (key && key !== 'null' && key !== 'undefined' && !isFreeOrExpired) {
             initEventStream(key);
           }
         } else {
@@ -1094,6 +1107,29 @@
         }
       } catch(e) {
         alert('Network connectivity error updating budget cap.');
+      }
+    }
+
+    async function refreshClientCap() {
+      let key = localStorage.getItem('cloudgrip_key');
+      if (!key || key === 'null' || key === 'undefined') key = '';
+      const email = localStorage.getItem('cloudgrip_email');
+
+      try {
+        const res = await fetch('/client/reset-spend', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(key ? { 'x-cloudgrip-key': key } : {}) },
+          body: JSON.stringify({ email })
+        });
+        const data = await res.json();
+        if(data.success) {
+          alert('Spend cap refreshed successfully to $0.00.');
+          location.reload();
+        } else {
+          alert(data.error || 'Failed to refresh cap.');
+        }
+      } catch(e) {
+        alert('Network connectivity error refreshing cap.');
       }
     }
 
