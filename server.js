@@ -46,6 +46,18 @@ function requireAdmin(req, res, next) {
   res.redirect('/admin/login');
 }
 
+// Track Website Visits Middleware for Homepage
+app.use(async (req, res, next) => {
+  if (req.path === '/' && req.method === 'GET') {
+    try {
+      await pool.query('INSERT INTO site_visits (visited_at) VALUES (NOW())');
+    } catch (err) {
+      console.error('Error logging site visit:', err.message);
+    }
+  }
+  next();
+});
+
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
@@ -104,13 +116,23 @@ app.get('/admin/logout', (req, res) => {
   });
 });
 
+// Admin Route to Reset User Spend Limit back to $0.00
+app.post('/admin/reset-spend', requireAdmin, express.urlencoded({ extended: true }), async (req, res) => {
+  const { clientId } = req.body;
+  if (clientId) {
+    await pool.query('UPDATE clients SET current_spend_usd = 0.00 WHERE id = $1', [clientId]);
+  }
+  res.redirect('/analytics');
+});
+
 // Protected Custom Analytics Dashboard Route
 app.get('/analytics', requireAdmin, async (req, res) => {
   try {
     const usersCountRes = await pool.query('SELECT COUNT(*) FROM clients');
     const activeSubsRes = await pool.query("SELECT COUNT(*) FROM clients WHERE status = 'active'");
-    const totalRevenueRes = await pool.query('SELECT SUM(current_spend_usd) FROM clients');
     const totalRequestsRes = await pool.query('SELECT COUNT(*) FROM request_logs');
+    const siteVisitsRes = await pool.query('SELECT COUNT(*) FROM site_visits');
+    const clientsRes = await pool.query('SELECT id, email, current_spend_usd, budget_cap_usd, status FROM clients ORDER BY id DESC');
     
     const chartDataRes = await pool.query(`
       SELECT TO_CHAR(timestamp, 'Dy') as day, COUNT(*) as count 
@@ -122,11 +144,26 @@ app.get('/analytics', requireAdmin, async (req, res) => {
 
     const totalUsers = parseInt(usersCountRes.rows[0]?.count || 0);
     const activeSubs = parseInt(activeSubsRes.rows[0]?.count || 0);
-    const totalRevenue = parseFloat(totalRevenueRes.rows[0]?.sum || 0).toFixed(2);
+    const totalRevenue = (activeSubs * 20.00).toFixed(2);
     const proxyRequests = parseInt(totalRequestsRes.rows[0]?.count || 0);
+    const siteVisits = parseInt(siteVisitsRes.rows[0]?.count || 0);
 
     const chartLabels = chartDataRes.rows.map(r => r.day);
     const chartValues = chartDataRes.rows.map(r => parseInt(r.count));
+
+    let clientsTableHtml = clientsRes.rows.map(c => `
+      <tr>
+        <td style="padding: 12px; border-bottom: 1px solid #1e293b;">${c.email}</td>
+        <td style="padding: 12px; border-bottom: 1px solid #1e293b;">$${parseFloat(c.current_spend_usd).toFixed(2)} / $${c.budget_cap_usd}</td>
+        <td style="padding: 12px; border-bottom: 1px solid #1e293b;"><span style="padding: 4px 8px; border-radius: 4px; font-size: 11px; background: ${c.status === 'active' ? 'rgba(16, 185, 129, 0.2); color: #10b981;' : 'rgba(239, 68, 68, 0.2); color: #ef4444;'}">${c.status}</span></td>
+        <td style="padding: 12px; border-bottom: 1px solid #1e293b; text-align: right;">
+          <form action="/admin/reset-spend" method="POST" style="margin:0;">
+            <input type="hidden" name="clientId" value="${c.id}" />
+            <button type="submit" style="padding: 6px 12px; background: #3b82f6; border: none; color: #fff; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 500;">🔄 Refresh Cap ($0)</button>
+          </form>
+        </td>
+      </tr>
+    `).join('');
 
     res.send(`
       <!DOCTYPE html>
@@ -138,19 +175,21 @@ app.get('/analytics', requireAdmin, async (req, res) => {
         <style>
           body { background: #0b0f19; color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 30px; }
           .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e293b; padding-bottom: 15px; margin-bottom: 25px; }
-          .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 30px; }
+          .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 20px; margin-bottom: 30px; }
           .card { background: #131b2e; border: 1px solid #1e293b; border-radius: 8px; padding: 20px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
           .card h3 { margin: 0 0 10px 0; font-size: 14px; color: #94a3b8; font-weight: 500; }
           .card .value { font-size: 28px; font-weight: 700; color: #fff; }
           .card .subtext { font-size: 12px; color: #10b981; margin-top: 5px; }
-          .chart-container { background: #131b2e; border: 1px solid #1e293b; border-radius: 8px; padding: 20px; }
+          .section { background: #131b2e; border: 1px solid #1e293b; border-radius: 8px; padding: 20px; margin-bottom: 30px; }
+          table { width: 100%; border-collapse: collapse; font-size: 14px; text-align: left; color: #cbd5e1; }
+          th { padding: 12px; border-bottom: 1px solid #334155; color: #94a3b8; font-weight: 500; }
           a.logout { color: #ef4444; text-decoration: none; font-size: 14px; padding: 6px 12px; background: rgba(239, 68, 68, 0.1); border-radius: 4px; }
           a.logout:hover { background: rgba(239, 68, 68, 0.2); }
         </style>
       </head>
       <body>
         <div class="header">
-          <h1 style="font-size: 20px; margin: 0; display:flex; align-items:center; gap:10px;">🛡️ CloudGrip Analytics</h1>
+          <h1 style="font-size: 20px; margin: 0; display:flex; align-items:center; gap:10px;">🛡️ CloudGrip Analytics & Management</h1>
           <a href="/admin/logout" class="logout">Logout</a>
         </div>
 
@@ -158,7 +197,7 @@ app.get('/analytics', requireAdmin, async (req, res) => {
           <div class="card" style="border-left: 4px solid #10b981;">
             <h3>Revenue</h3>
             <div class="value">$${totalRevenue}</div>
-            <div class="subtext">Live database aggregation</div>
+            <div class="subtext">$20.00 × Active Subs</div>
           </div>
           <div class="card">
             <h3>Active Subs</h3>
@@ -168,15 +207,37 @@ app.get('/analytics', requireAdmin, async (req, res) => {
             <h3>Total Users</h3>
             <div class="value">${totalUsers}</div>
           </div>
+          <div class="card" style="border-left: 4px solid #3b82f6;">
+            <h3>Website Visits</h3>
+            <div class="value">${siteVisits}</div>
+            <div class="subtext">Homepage loads</div>
+          </div>
           <div class="card">
             <h3>Proxy Requests</h3>
             <div class="value">${proxyRequests}</div>
           </div>
         </div>
 
-        <div class="chart-container">
-          <h3 style="margin-top: 0; color: #94a3b8; font-size: 14px;">Proxy Request Volume (Last 7 Days)</h3>
-          <canvas id="trafficChart" height="80"></canvas>
+        <div class="section">
+          <h3 style="margin-top: 0; color: #fff; font-size: 16px; margin-bottom: 15px;">Registered Clients & Spend Management</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Email</th>
+                <th>Current Spend / Cap</th>
+                <th>Status</th>
+                <th style="text-align: right;">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${clientsTableHtml || '<tr><td colspan="4" style="padding:15px; text-align:center; color:#64748b;">No registered clients found.</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="section">
+          <h3 style="margin-top: 0; color: #94a3b8; font-size: 14px; margin-bottom: 15px;">Proxy Request Volume (Last 7 Days)</h3>
+          <canvas id="trafficChart" height="70"></canvas>
         </div>
 
         <script>
@@ -468,7 +529,7 @@ app.post('/login', async (req, res) => {
 
 // Middleware for proxy traffic only with hard budget cap circuit breaker enforcement
 app.use(async (req, res, next) => {
-  if (['/events', '/register', '/login', '/', '/terms', '/privacy', '/client/stats', '/client/budget-cap', '/forgot-password', '/admin/login', '/analytics'].includes(req.path) || req.path.startsWith('/api/topup/')) return next();
+  if (['/events', '/register', '/login', '/', '/terms', '/privacy', '/client/stats', '/client/budget-cap', '/forgot-password', '/admin/login', '/analytics', '/admin/reset-spend'].includes(req.path) || req.path.startsWith('/api/topup/')) return next();
   if (req.path.startsWith('/css/') || req.path.startsWith('/js/') || req.path.startsWith('/images/')) return next();
 
   const clientKey = req.headers['x-cloudgrip-key'] || req.query.cloudgrip_key;
@@ -495,7 +556,7 @@ app.use(async (req, res, next) => {
 });
 
 app.all(/.*/, async (req, res) => {
-  if (['/', '/register', '/login', '/events', '/terms', '/privacy', '/client/stats', '/client/budget-cap', '/forgot-password', '/admin/login', '/analytics'].includes(req.path) || req.path.startsWith('/api/topup/')) return;
+  if (['/', '/register', '/login', '/events', '/terms', '/privacy', '/client/stats', '/client/budget-cap', '/forgot-password', '/admin/login', '/analytics', '/admin/reset-spend'].includes(req.path) || req.path.startsWith('/api/topup/')) return;
 
   let statusCode = 502;
   let cost = 0.01;
@@ -592,6 +653,11 @@ async function startServer() {
         status_code INT,
         cost REAL,
         timestamp TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS site_visits (
+        id SERIAL PRIMARY KEY,
+        visited_at TIMESTAMPTZ DEFAULT NOW()
       );
     `);
     console.log('[CloudGrip Engine] Connected to Supabase PostgreSQL & Tables Verified');
