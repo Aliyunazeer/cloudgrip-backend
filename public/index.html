@@ -436,11 +436,11 @@
     footer a { color: var(--text-muted); text-decoration: none; margin-left: 16px; }
 
     /* ==========================================================================
-   CloudGrip Mobile Responsiveness & Touch Optimization
+   CloudGrip Corrected Mobile Responsiveness
    ========================================================================== */
 
 @media (max-width: 768px) {
-  /* Prevent horizontal overflow on small screens */
+  /* Prevent horizontal overflow */
   body, html {
     overflow-x: hidden;
     margin: 0;
@@ -448,89 +448,83 @@
     width: 100%;
   }
 
-  /* Global Container Padding Adjustment */
-  .landing-hero, 
-  .dashboard-container, 
-  header, 
-  footer,
-  main {
-    padding-left: 16px !important;
-    padding-right: 16px !important;
+  /* Keep top navigation visible and stack header contents */
+  header {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    padding: 12px 16px !important;
+    width: 100% !important;
     box-sizing: border-box;
   }
 
-  /* Landing Page Headline Scaling */
-  h1 {
-    font-size: 2rem !important;
-    line-height: 1.2 !important;
-  }
-
-  p {
-    font-size: 1rem !important;
-  }
-
-  /* Navigation & Header Overhaul */
+  /* Force Features, Pricing, GitHub, Sign In links to stay visible (or format nicely) */
   header nav, 
+  .nav-links, 
   .header-actions {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    width: 100%;
+    display: flex !important;
+    gap: 12px !important;
+    align-items: center !important;
   }
 
-  /* Hamburger Sidebar Menu Optimization */
+  header nav a, 
+  .nav-links a {
+    font-size: 0.85rem !important;
+    padding: 4px 6px !important;
+  }
+
+  /* Ensure the hamburger icon is visible and tappable */
+  .hamburger-icon, 
+  .menu-toggle {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    cursor: pointer;
+    z-index: 1001;
+  }
+
+  /* Sidebar styling for mobile: hidden off-screen until toggled open */
   .sidebar, 
   .nav-sidebar {
     position: fixed !important;
-    top: 0;
-    left: -100% !important; /* Hidden off-screen by default on mobile */
-    width: 280px !important;
+    top: 0 !important;
+    left: -280px !important; /* Hidden completely by default */
+    width: 260px !important;
     height: 100vh !important;
     z-index: 1000;
-    transition: left 0.3s ease-in-out;
+    transition: left 0.3s ease-in-out !important;
     background-color: #000000 !important;
-    border-right: 1px solid #27272a;
-    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.8);
+    border-right: 1px solid #27272a !important;
+    padding-top: 60px; /* Space for close/header */
   }
 
-  /* Active state when hamburger is toggled open on mobile */
+  /* When JS adds 'active' or 'open' class to sidebar via hamburger click */
   .sidebar.active, 
+  .sidebar.open,
+  .nav-sidebar.active, 
   .nav-sidebar.open {
-    left: 0 !important;
+    left: 0 !important; /* Slides into view */
   }
 
-  /* Main Content Shift when sidebar is active */
+  /* Ensure dashboard and main contents don't collapse or hide */
+  .dashboard-container, 
   .main-content, 
   .dashboard-content {
-    margin-left: 0 !important;
+    display: block !important;
     width: 100% !important;
+    margin-left: 0 !important;
+    padding: 12px !important;
+    box-sizing: border-box;
   }
 
-  /* Grid and Flex Adjustments for Mobile Cards */
+  /* Stack grids vertically */
   .metrics-grid, 
   .card-container, 
-  .features-grid, 
-  .pricing-grid {
+  .features-grid {
     display: flex !important;
     flex-direction: column !important;
-    gap: 16px !important;
+    gap: 12px !important;
     width: 100% !important;
-  }
-
-  /* Command Terminal / Code snippet box scaling */
-  pre, code, .terminal-box {
-    max-width: 100% !important;
-    overflow-x: auto !important;
-    font-size: 0.85rem !important;
-    padding: 12px !important;
-  }
-
-  /* Buttons & Action Elements */
-  button, .btn {
-    width: 100% !important;
-    text-align: center !important;
-    justify-content: center !important;
-    padding: 12px 16px !important;
   }
 }
   </style>
