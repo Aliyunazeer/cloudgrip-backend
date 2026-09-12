@@ -443,10 +443,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
       <h1>cloudgrip/core</h1>
     </div>
-    <div class="nav-links" id="nav-links-container">
-      <a href="#features" onclick="showLandingView()">Features</a>
-      <a href="#pricing" onclick="showLandingView()">Pricing</a>
-      <a href="https://github.com/Aliyunazeer/cloudgrip-backend" target="_blank">GitHub</a>
+    <div class="nav-links">
+      <a href="#features" id="link-features" onclick="showLandingView()">Features</a>
+      <a href="#pricing" id="link-pricing" onclick="showLandingView()">Pricing</a>
+      <a href="https://github.com/Aliyunazeer/cloudgrip-backend" id="link-github" target="_blank">GitHub</a>
       <a href="#" onclick="showAuthView('login'); return false;" id="nav-auth-link">Sign In</a>
     </div>
   </nav>
@@ -795,6 +795,11 @@
       document.getElementById('landing-view').classList.remove('hidden');
       document.getElementById('auth-view').classList.add('hidden');
       document.getElementById('dashboard-view').classList.add('hidden');
+      
+      // Show landing nav items again
+      document.getElementById('link-features').style.display = 'inline';
+      document.getElementById('link-pricing').style.display = 'inline';
+      document.getElementById('link-github').style.display = 'inline';
       document.getElementById('nav-auth-link').innerText = "Sign In";
     }
 
@@ -876,6 +881,11 @@
       document.getElementById('landing-view').classList.add('hidden');
       document.getElementById('auth-view').classList.add('hidden');
       document.getElementById('dashboard-view').classList.remove('hidden');
+      
+      // Hide Features, Pricing, and GitHub from top navbar when inside dashboard
+      document.getElementById('link-features').style.display = 'none';
+      document.getElementById('link-pricing').style.display = 'none';
+      document.getElementById('link-github').style.display = 'none';
       document.getElementById('nav-auth-link').innerText = "Dashboard";
 
       document.getElementById('res-key').innerText = key && key !== 'null' ? key : 'API Key Paused (Resubscription Required)';
