@@ -150,7 +150,7 @@ app.get('/analytics', requireAdmin, async (req, res) => {
 
     const totalUsers = parseInt(usersCountRes.rows[0]?.count || 0);
     const activeSubs = parseInt(activeSubsRes.rows[0]?.count || 0);
-    const totalRevenue = (activeSubs * 20.00).toFixed(2);
+    const totalRevenue = (activeSubs * 15.00).toFixed(2);
     const proxyRequests = parseInt(totalRequestsRes.rows[0]?.count || 0);
     const siteVisits = parseInt(siteVisitsRes.rows[0]?.count || 0);
 
@@ -203,7 +203,7 @@ app.get('/analytics', requireAdmin, async (req, res) => {
           <div class="card" style="border-left: 4px solid #10b981;">
             <h3>Revenue</h3>
             <div class="value">$${totalRevenue}</div>
-            <div class="subtext">$20.00 x Active Subs</div>
+            <div class="subtext">$15.00 x Active Subs</div>
           </div>
           <div class="card">
             <h3>Active Subs</h3>
@@ -289,7 +289,7 @@ app.post('/forgot-password', async (req, res) => {
   res.json({ success: true, message: 'Password recovery instructions sent to your email.' });
 });
 
-// Client Stats & Expiry Check (Preserves API key, sets status to expired, provides pause notice)
+// Client Stats & Expiry Check
 app.get('/client/stats', async (req, res) => {
   let clientKey = req.headers['x-cloudgrip-key'] || req.query.cloudgrip_key;
   if (!clientKey || clientKey === 'null' || clientKey === 'undefined') clientKey = null;
@@ -322,11 +322,11 @@ app.get('/client/stats', async (req, res) => {
   res.json({
     success: true,
     currentSpendUSD: client.current_spend_usd,
-    budgetCapUSD: client.budget_cap_usd || 20.00,
+    budgetCapUSD: client.budget_cap_usd || 15.00,
     trialExpiresAt: client.trial_expires_at,
     status: status,
     email: client.email,
-    client_key: client.client_key, // Preserved even when expired
+    client_key: client.client_key,
     notice: status === 'expired' ? 'Your API gateway access has been paused until you resubscribe.' : null,
     logs: logsResult.rows
   });
@@ -381,7 +381,7 @@ app.post('/client/reset-spend', async (req, res) => {
   res.json({ success: true, message: 'Spend cap refreshed successfully.' });
 });
 
-// Initialize Paystack Subscription ($20 USD converted to NGN)
+// Initialize Paystack Subscription ($15 USD converted to NGN)
 app.post('/api/topup/initialize', async (req, res) => {
   let clientKey = req.headers['x-cloudgrip-key'] || req.body.client_key;
   if (!clientKey || clientKey === 'null' || clientKey === 'undefined') clientKey = null;
@@ -399,7 +399,7 @@ app.post('/api/topup/initialize', async (req, res) => {
 
   if (!client) return res.status(403).json({ error: 'Forbidden or Account not found.' });
 
-  const amountUSD = 20.00;
+  const amountUSD = 15.00;
   const usdToNgnRate = parseFloat(process.env.USD_NGN_RATE) || 1500;
   const amountNGN = amountUSD * usdToNgnRate;
 
@@ -435,7 +435,7 @@ app.post('/api/topup/initialize', async (req, res) => {
   }
 });
 
-// Verify Payment & Reactivate Subscription (Keeps existing API key, resets spend, renews expiry)
+// Verify Payment & Reactivate Subscription
 app.get('/api/topup/verify', async (req, res) => {
   const { reference, email, amount } = req.query;
   if (!reference || !email) {
@@ -528,11 +528,11 @@ app.post('/register', async (req, res) => {
     await pool.query(`
       INSERT INTO clients (client_key, email, password_hash, device_fingerprint, budget_usd, current_spend_usd, budget_cap_usd, trial_expires_at, status)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-    `, [clientKey, email, hashedPassword, fingerprint || 'unknown', 20.00, 0.00, 20.00, trialExpiresAt, status]);
+    `, [clientKey, email, hashedPassword, fingerprint || 'unknown', 15.00, 0.00, 15.00, trialExpiresAt, status]);
 
     res.json({ 
       success: true, 
-      apiKey: clientKey, // Null for returning device users as requested
+      apiKey: clientKey,
       email: email,
       requiresPayment: !isNewDevice,
       message: isNewDevice ? '7-day trial activated!' : 'Account created. Please complete subscription payment to generate your API key.'
@@ -573,7 +573,6 @@ app.use(async (req, res, next) => {
   const now = new Date();
   const trialExpiry = new Date(clientConfig.trial_expires_at);
 
-  // Check if subscription status is expired or time has elapsed -> Pause function strictly
   if (clientConfig.status === 'expired' || now > trialExpiry) {
     if (clientConfig.status !== 'expired') {
       await pool.query("UPDATE clients SET status = 'expired' WHERE id = $1", [clientConfig.id]);
@@ -581,8 +580,7 @@ app.use(async (req, res, next) => {
     return res.status(402).json({ error: 'Payment Required: Your API gateway access has been paused due to an expired subscription. Please resubscribe to reactivate.' });
   }
 
-  // Hard Budget Cap Circuit Breaker Check
-  if (clientConfig.current_spend_usd >= (clientConfig.budget_cap_usd || 20.00)) {
+  if (clientConfig.current_spend_usd >= (clientConfig.budget_cap_usd || 15.00)) {
     return res.status(402).json({ error: 'Circuit Breaker Triggered: Maximum budget cap reached. Please top up or increase your cap.' });
   }
 
@@ -675,7 +673,7 @@ async function startServer() {
         device_fingerprint TEXT,
         budget_usd REAL NOT NULL,
         current_spend_usd REAL NOT NULL,
-        budget_cap_usd REAL DEFAULT 20.00,
+        budget_cap_usd REAL DEFAULT 15.00,
         trial_expires_at TIMESTAMPTZ NOT NULL,
         status TEXT DEFAULT 'active'
       );
