@@ -12,7 +12,6 @@ import path from 'path';
 import axios from 'axios';
 import { fileURLToPath } from 'url';
 import { Resend } from 'resend';
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -28,17 +27,8 @@ const pool = new Pool({
   family: 4
 });
 
-// Configure Nodemailer Email Transporter (Forced to IPv4 for Render cloud compatibility)
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  },
-  socketTimeout: 10000,
-  connectionTimeout: 10000,
-  family: 4
-});
+// Initialize Resend API Client
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -212,6 +202,9 @@ async function sendOtpEmail(email, otpCode) {
     console.log(`[CloudGrip Resend] OTP successfully dispatched to ${email}`);
   } catch (emailErr) {
     console.error(`[Resend API Error]: ${emailErr.message}`);
+    console.log(`========================================`);
+    console.log(`[FALLBACK OTP CODE FOR ${email}]: ${otpCode}`);
+    console.log(`========================================`);
   }
 }
 
@@ -228,7 +221,6 @@ app.post('/register', async (req, res) => {
         const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
         await pool.query('UPDATE clients SET otp_code = $1, otp_expires_at = $2 WHERE email = $3', [otpCode, expiresAt, email]);
         
-        // Non-blocking background email dispatch with fallback
         sendOtpEmail(email, otpCode);
 
         return res.json({ success: false, requiresOtp: true, message: 'Unverified account. New 6-digit OTP code sent.' });
@@ -247,7 +239,6 @@ app.post('/register', async (req, res) => {
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
     `, [clientKey, email, hashedPassword, fingerprint || 'unknown', 15.00, 0.00, 15.00, trialExpiresAt, 'pending_verification', otpCode, otpExpiresAt, false]);
 
-    // Non-blocking background email dispatch with fallback
     sendOtpEmail(email, otpCode);
 
     res.json({ 
@@ -303,7 +294,6 @@ app.post('/login', async (req, res) => {
       const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
       await pool.query('UPDATE clients SET otp_code = $1, otp_expires_at = $2 WHERE email = $3', [otpCode, expiresAt, email]);
       
-      // Non-blocking background email dispatch with fallback on login
       sendOtpEmail(email, otpCode);
 
       return res.status(403).json({ 
