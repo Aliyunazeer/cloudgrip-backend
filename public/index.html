@@ -668,7 +668,7 @@
           <input type="password" id="auth-pass" placeholder="••••••••">
         </div>
 
-        <button id="auth-submit-btn" class="btn btn-primary" style="width:100%" onclick="handleAuthSubmit()">Sign In</button>
+         <button id="auth-submit-btn" class="btn btn-primary" style="width:100%">Sign In</button>
       </div>
 
       <!-- OTP VERIFICATION FORM SECTION -->
@@ -1058,6 +1058,50 @@
       localStorage.removeItem('cloudgrip_email');
       showLandingView();
     }
+
+    document.getElementById('auth-submit-btn').addEventListener('click', async (e) => {
+  e.preventDefault();
+  hideMsg();
+  
+  const email = document.getElementById('auth-email').value.trim();
+  const password = document.getElementById('auth-pass').value;
+  
+  if (!email || !password) {
+    return showError('All fields are required.');
+  }
+
+  const endpoint = isSignUpMode ? '/register' : '/login';
+  const payload = isSignUpMode 
+    ? { email, password, fingerprint: navigator.userAgent + screen.width } 
+    : { email, password };
+
+  try {
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    
+    const data = await res.json();
+
+    if (res.ok && data.success) {
+      if (data.apiKey) localStorage.setItem('cloudgrip_key', data.apiKey);
+      localStorage.setItem('cloudgrip_email', email);
+      await loadDashboard(data.apiKey, email);
+    } else if (data.requiresOtp) {
+      pendingVerificationEmail = data.email || email;
+      document.getElementById('otp-sent-email').innerText = pendingVerificationEmail;
+      document.getElementById('auth-form-fields').classList.add('hidden');
+      document.getElementById('otp-verify-section').classList.remove('hidden');
+      showSuccess(data.message || 'Verification code sent.');
+    } else {
+      showError(data.error || 'Authentication failed.');
+    }
+  } catch (err) {
+    console.error('Auth Error:', err);
+    showError('Network connectivity error.');
+  }
+});
   </script>
 </body>
 </html>
