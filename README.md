@@ -1,34 +1,34 @@
-# CloudGrip
+# CloudGrip 
 
-CloudGrip is a local proxy gateway designed to protect developer API budgets and intercept runaway agent loops before unexpected charges occur.
+A lightweight, self-hosted AI proxy gateway and dashboard built with Node.js, Express, and SQLite to manage LLM API budgets and control execution loops.
 
-## The Problem
+## Why CloudGrip?
+Runaway agent loops and unmonitored context reloads can drain your API budget overnight. CloudGrip acts as a local circuit-breaker proxy, enforcing strict budget caps and giving you real-time visibility over your API spend and request logs.
 
-When building automated software workflows or multi-step AI agents, scripts often communicate with language model APIs in rapid loops. If a small logic error occurs, an agent can get stuck talking to itself endlessly. Without guardrails, these recursive loops can execute thousands of requests overnight, resulting in surprise bills.
+## Features
+- **Budget Circuit-Breaker:** Automatically halts requests when spending reaches your configured cap.
+- **Real-Time Telemetry:** Tracks site visits, client spend, and request metadata.
+- **Self-Hosted Privacy:** All logs and proxy states stay secure within your own instance.
+- **Admin Analytics Dashboard:** Built-in dark-mode dashboard to monitor active users and token metrics.
 
-## How CloudGrip Works
+## Quickstart
 
-CloudGrip sits locally between your application code and the upstream API provider. 
+1. **Clone the repository:**
+   git clone https://github.com/Aliyunazeer/cloudgrip-backend.git
+   cd cloudgrip-backend
 
-1. **Interception:** All outgoing API traffic routes through your CloudGrip instance.
-2. **Consumption Tracking:** It tracks cumulative spending locally or via your private database.
-3. **Hard-Cap Circuit Breaker:** The moment your strict budget ceiling (defaulting to $15.00) is reached, CloudGrip automatically blocks further requests, stopping runaway loops dead in their tracks.
+2. **Install dependencies:**
+   npm install
 
-## Quick Installation
+3. **Configure your environment:**
+   Create a .env file in the root directory and add your credentials:
+   PORT=5000
+   DATABASE_URL=your_supabase_postgres_connection_string
+   RESEND_API_KEY=your_resend_api_key
+   SESSION_SECRET=your_secure_session_secret
 
-To install the proxy package in your project environment, run:
+4. **Run the server:**
+   node server.js
 
-```bash
-npm install cloudgrip-proxy
-
-
-Getting Started
-1. Set up your environment variables or local connection string.
-
-2. Route your application client requests through the local proxy gateway.
-
-3. Access your control dashboard to monitor real-time telemetry streams and configure your hard spending caps.
-
-License
-This project is open-source software released under the MIT License.
-
+## License
+MIT
